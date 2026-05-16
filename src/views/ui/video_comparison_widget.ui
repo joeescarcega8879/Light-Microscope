@@ -1,0 +1,224 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>VideoComparisonWidget</class>
+ <widget class="QWidget" name="VideoComparisonWidget">
+  <layout class="QVBoxLayout" name="mainLayout">
+   <property name="spacing"><number>12</number></property>
+   <property name="leftMargin"><number>16</number></property>
+   <property name="topMargin"><number>16</number></property>
+   <property name="rightMargin"><number>16</number></property>
+   <property name="bottomMargin"><number>16</number></property>
+
+   <item>
+    <layout class="QHBoxLayout" name="loadLayout">
+     <property name="spacing"><number>10</number></property>
+
+     <item>
+      <widget class="QPushButton" name="btnLoadVideo">
+       <property name="text"><string>Load Video…</string></property>
+       <property name="minimumHeight"><number>36</number></property>
+       <property name="minimumWidth"><number>140</number></property>
+      </widget>
+     </item>
+
+     <item>
+      <widget class="QLabel" name="lblVideoPath">
+       <property name="text"><string>No video loaded</string></property>
+      </widget>
+     </item>
+
+     <item>
+      <spacer name="loadSpacer">
+       <property name="orientation"><enum>Qt::Horizontal</enum></property>
+       <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
+      </spacer>
+     </item>
+
+     <item>
+      <widget class="QLabel" name="lblVideoInfo">
+       <property name="text"><string></string></property>
+       <property name="alignment"><set>Qt::AlignRight|Qt::AlignVCenter</set></property>
+      </widget>
+     </item>
+
+    </layout>
+   </item>
+
+   <item>
+    <layout class="QHBoxLayout" name="framesLayout">
+     <property name="spacing"><number>12</number></property>
+
+     <item>
+      <widget class="QGroupBox" name="groupFrameA">
+       <property name="title"><string>Frame A</string></property>
+       <layout class="QVBoxLayout" name="layoutFrameA">
+        <property name="spacing"><number>8</number></property>
+
+        <item>
+         <widget class="QLabel" name="lblFrameA">
+          <property name="text"><string>—</string></property>
+          <property name="alignment"><set>Qt::AlignCenter</set></property>
+          <property name="minimumSize"><size><width>320</width><height>220</height></size></property>
+         </widget>
+        </item>
+
+        <item>
+         <layout class="QHBoxLayout" name="selectorALayout">
+          <property name="spacing"><number>8</number></property>
+          <item>
+           <widget class="QSlider" name="sliderFrameA">
+            <property name="orientation"><enum>Qt::Horizontal</enum></property>
+            <property name="minimum"><number>0</number></property>
+            <property name="maximum"><number>0</number></property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QSpinBox" name="spinFrameA">
+            <property name="minimum"><number>0</number></property>
+            <property name="maximum"><number>0</number></property>
+            <property name="minimumWidth"><number>70</number></property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+
+       </layout>
+      </widget>
+     </item>
+
+     <item>
+      <widget class="QGroupBox" name="groupFrameB">
+       <property name="title"><string>Frame B</string></property>
+       <layout class="QVBoxLayout" name="layoutFrameB">
+        <property name="spacing"><number>8</number></property>
+
+        <item>
+         <widget class="QLabel" name="lblFrameB">
+          <property name="text"><string>—</string></property>
+          <property name="alignment"><set>Qt::AlignCenter</set></property>
+          <property name="minimumSize"><size><width>320</width><height>220</height></size></property>
+         </widget>
+        </item>
+
+        <item>
+         <layout class="QHBoxLayout" name="selectorBLayout">
+          <property name="spacing"><number>8</number></property>
+          <item>
+           <widget class="QSlider" name="sliderFrameB">
+            <property name="orientation"><enum>Qt::Horizontal</enum></property>
+            <property name="minimum"><number>0</number></property>
+            <property name="maximum"><number>0</number></property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QSpinBox" name="spinFrameB">
+            <property name="minimum"><number>0</number></property>
+            <property name="maximum"><number>0</number></property>
+            <property name="minimumWidth"><number>70</number></property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+
+       </layout>
+      </widget>
+     </item>
+
+    </layout>
+   </item>
+
+   <item>
+    <layout class="QHBoxLayout" name="compareLayout">
+     <property name="spacing"><number>10</number></property>
+
+     <item>
+      <widget class="QPushButton" name="btnCompareFrames">
+       <property name="text"><string>Compare Frames</string></property>
+       <property name="minimumHeight"><number>36</number></property>
+       <property name="minimumWidth"><number>140</number></property>
+      </widget>
+     </item>
+
+     <item>
+      <widget class="QLabel" name="lblSensitivity">
+       <property name="text"><string>Sensitivity:</string></property>
+      </widget>
+     </item>
+
+     <item>
+      <widget class="QSlider" name="sliderThreshold">
+       <property name="orientation"><enum>Qt::Horizontal</enum></property>
+       <property name="minimum"><number>1</number></property>
+       <property name="maximum"><number>100</number></property>
+       <property name="value"><number>25</number></property>
+       <property name="maximumWidth"><number>180</number></property>
+      </widget>
+     </item>
+
+     <item>
+      <widget class="QLabel" name="lblThresholdValue">
+       <property name="text"><string>25</string></property>
+       <property name="minimumWidth"><number>28</number></property>
+       <property name="alignment"><set>Qt::AlignCenter</set></property>
+      </widget>
+     </item>
+
+     <item>
+      <spacer name="compareSpacer">
+       <property name="orientation"><enum>Qt::Horizontal</enum></property>
+       <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
+      </spacer>
+     </item>
+
+     <item>
+      <widget class="QLabel" name="lblStats">
+       <property name="text"><string></string></property>
+       <property name="alignment"><set>Qt::AlignRight|Qt::AlignVCenter</set></property>
+      </widget>
+     </item>
+
+    </layout>
+   </item>
+
+   <item>
+    <layout class="QHBoxLayout" name="resultLayout">
+     <property name="spacing"><number>12</number></property>
+
+     <item>
+      <widget class="QGroupBox" name="groupDiff">
+       <property name="title"><string>Differences</string></property>
+       <layout class="QVBoxLayout" name="layoutDiff">
+        <item>
+         <widget class="QLabel" name="lblDiff">
+          <property name="text"><string>—</string></property>
+          <property name="alignment"><set>Qt::AlignCenter</set></property>
+          <property name="minimumSize"><size><width>320</width><height>200</height></size></property>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+     </item>
+
+     <item>
+      <widget class="QGroupBox" name="groupHeatmap">
+       <property name="title"><string>Diff Heatmap</string></property>
+       <layout class="QVBoxLayout" name="layoutHeatmap">
+        <item>
+         <widget class="QLabel" name="lblHeatmap">
+          <property name="text"><string>—</string></property>
+          <property name="alignment"><set>Qt::AlignCenter</set></property>
+          <property name="minimumSize"><size><width>320</width><height>200</height></size></property>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+     </item>
+
+    </layout>
+   </item>
+
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

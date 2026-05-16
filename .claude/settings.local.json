@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(touch main.py requirements.txt)",
+      "Bash(mkdir -p app/models app/views app/presenters app/utils)",
+      "Bash(touch app/__init__.py app/models/__init__.py app/models/image_model.py app/views/__init__.py app/views/main_window.py app/views/image_panel.py app/presenters/__init__.py app/presenters/comparison_presenter.py app/utils/__init__.py app/utils/image_utils.py)"
+    ]
+  }
+}

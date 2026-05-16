@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>ImageComparisonWidget</class>
+ <widget class="QWidget" name="ImageComparisonWidget">
+  <layout class="QVBoxLayout" name="mainLayout">
+   <property name="spacing"><number>12</number></property>
+   <property name="leftMargin"><number>16</number></property>
+   <property name="topMargin"><number>16</number></property>
+   <property name="rightMargin"><number>16</number></property>
+   <property name="bottomMargin"><number>16</number></property>
+
+   <item>
+    <layout class="QHBoxLayout" name="originalsLayout">
+     <property name="spacing"><number>12</number></property>
+
+     <item>
+      <widget class="QGroupBox" name="groupImageA">
+       <property name="title"><string>Image A</string></property>
+       <layout class="QVBoxLayout" name="layoutA">
+        <property name="spacing"><number>8</number></property>
+        <item>
+         <widget class="QPushButton" name="btnLoadA">
+          <property name="text"><string>Load Image A…</string></property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QLabel" name="lblImageA">
+          <property name="text"><string>No image loaded</string></property>
+          <property name="alignment"><set>Qt::AlignCenter</set></property>
+          <property name="minimumSize"><size><width>320</width><height>240</height></size></property>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+     </item>
+
+     <item>
+      <widget class="QGroupBox" name="groupImageB">
+       <property name="title"><string>Image B</string></property>
+       <layout class="QVBoxLayout" name="layoutB">
+        <property name="spacing"><number>8</number></property>
+        <item>
+         <widget class="QPushButton" name="btnLoadB">
+          <property name="text"><string>Load Image B…</string></property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QLabel" name="lblImageB">
+          <property name="text"><string>No image loaded</string></property>
+          <property name="alignment"><set>Qt::AlignCenter</set></property>
+          <property name="minimumSize"><size><width>320</width><height>240</height></size></property>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+     </item>
+
+    </layout>
+   </item>
+
+   <item>
+    <layout class="QHBoxLayout" name="controlsLayout">
+     <property name="spacing"><number>10</number></property>
+
+     <item>
+      <widget class="QPushButton" name="btnCompare">
+       <property name="text"><string>Compare</string></property>
+       <property name="minimumHeight"><number>36</number></property>
+       <property name="minimumWidth"><number>120</number></property>
+      </widget>
+     </item>
+
+     <item>
+      <widget class="QLabel" name="lblSensitivity">
+       <property name="text"><string>Sensitivity:</string></property>
+      </widget>
+     </item>
+
+     <item>
+      <widget class="QSlider" name="sliderThreshold">
+       <property name="orientation"><enum>Qt::Horizontal</enum></property>
+       <property name="minimum"><number>1</number></property>
+       <property name="maximum"><number>100</number></property>
+       <property name="value"><number>25</number></property>
+       <property name="maximumWidth"><number>180</number></property>
+       <property name="toolTip"><string>Pixel difference threshold (1 = most sensitive, 100 = least)</string></property>
+      </widget>
+     </item>
+
+     <item>
+      <widget class="QLabel" name="lblThresholdValue">
+       <property name="text"><string>25</string></property>
+       <property name="minimumWidth"><number>28</number></property>
+       <property name="alignment"><set>Qt::AlignCenter</set></property>
+      </widget>
+     </item>
+
+     <item>
+      <spacer name="ctrlSpacer">
+       <property name="orientation"><enum>Qt::Horizontal</enum></property>
+       <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
+      </spacer>
+     </item>
+
+     <item>
+      <widget class="QLabel" name="lblStats">
+       <property name="text"><string></string></property>
+       <property name="alignment"><set>Qt::AlignRight|Qt::AlignVCenter</set></property>
+      </widget>
+     </item>
+
+     <item>
+      <widget class="QPushButton" name="btnSaveResult">
+       <property name="text"><string>Save Result…</string></property>
+      </widget>
+     </item>
+
+    </layout>
+   </item>
+
+   <item>
+    <layout class="QHBoxLayout" name="resultsLayout">
+     <property name="spacing"><number>12</number></property>
+
+     <item>
+      <widget class="QGroupBox" name="groupDiff">
+       <property name="title"><string>Differences</string></property>
+       <layout class="QVBoxLayout" name="layoutDiff">
+        <item>
+         <widget class="QLabel" name="lblDiff">
+          <property name="text"><string>—</string></property>
+          <property name="alignment"><set>Qt::AlignCenter</set></property>
+          <property name="minimumSize"><size><width>320</width><height>220</height></size></property>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+     </item>
+
+     <item>
+      <widget class="QGroupBox" name="groupHeatmap">
+       <property name="title"><string>Diff Heatmap</string></property>
+       <layout class="QVBoxLayout" name="layoutHeatmap">
+        <item>
+         <widget class="QLabel" name="lblHeatmap">
+          <property name="text"><string>—</string></property>
+          <property name="alignment"><set>Qt::AlignCenter</set></property>
+          <property name="minimumSize"><size><width>320</width><height>220</height></size></property>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+     </item>
+
+    </layout>
+   </item>
+
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>
