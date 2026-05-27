@@ -3,102 +3,170 @@
  <class>MainWindow</class>
  <widget class="QMainWindow" name="MainWindow">
   <property name="geometry">
-   <rect><x>0</x><y>0</y><width>1400</width><height>900</height></rect>
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>1400</width>
+    <height>900</height>
+   </rect>
   </property>
   <property name="windowTitle">
    <string>Light Microscope</string>
   </property>
-
   <widget class="QWidget" name="centralwidget">
    <layout class="QHBoxLayout" name="rootLayout">
-    <property name="spacing"><number>0</number></property>
-    <property name="leftMargin"><number>0</number></property>
-    <property name="topMargin"><number>0</number></property>
-    <property name="rightMargin"><number>0</number></property>
-    <property name="bottomMargin"><number>0</number></property>
-
+    <property name="spacing">
+     <number>0</number>
+    </property>
+    <property name="leftMargin">
+     <number>0</number>
+    </property>
+    <property name="topMargin">
+     <number>0</number>
+    </property>
+    <property name="rightMargin">
+     <number>0</number>
+    </property>
+    <property name="bottomMargin">
+     <number>0</number>
+    </property>
     <item>
-     <widget class="QWidget" name="sidebar">
-      <property name="minimumWidth"><number>90</number></property>
-      <property name="maximumWidth"><number>90</number></property>
+     <widget class="QFrame" name="sidebar">
+      <property name="minimumSize">
+       <size>
+        <width>220</width>
+        <height>0</height>
+       </size>
+      </property>
       <layout class="QVBoxLayout" name="sidebarLayout">
-       <property name="spacing"><number>4</number></property>
-       <property name="leftMargin"><number>0</number></property>
-       <property name="topMargin"><number>12</number></property>
-       <property name="rightMargin"><number>0</number></property>
-       <property name="bottomMargin"><number>12</number></property>
-
+       <property name="spacing">
+        <number>4</number>
+       </property>
+       <property name="leftMargin">
+        <number>1</number>
+       </property>
+       <property name="topMargin">
+        <number>12</number>
+       </property>
+       <property name="rightMargin">
+        <number>1</number>
+       </property>
+       <property name="bottomMargin">
+        <number>12</number>
+       </property>
        <item>
-        <widget class="QLabel" name="lblAppTitle">
-         <property name="text"><string>LM</string></property>
-         <property name="alignment"><set>Qt::AlignCenter</set></property>
-         <property name="minimumHeight"><number>48</number></property>
+        <widget class="QPushButton" name="btnImages">
+         <property name="minimumSize">
+          <size>
+           <width>80</width>
+           <height>60</height>
+          </size>
+         </property>
+         <property name="toolTip">
+          <string>Image Comparison</string>
+         </property>
+         <property name="text">
+          <string>Images</string>
+         </property>
+         <property name="checkable">
+          <bool>false</bool>
+         </property>
+         <property name="checked">
+          <bool>false</bool>
+         </property>
+         <property name="autoExclusive">
+          <bool>true</bool>
+         </property>
         </widget>
        </item>
-
        <item>
-        <widget class="QToolButton" name="btnImages">
-         <property name="text"><string>Images</string></property>
-         <property name="toolTip"><string>Image Comparison</string></property>
-         <property name="minimumSize"><size><width>80</width><height>60</height></size></property>
-         <property name="toolButtonStyle"><enum>Qt::ToolButtonTextUnderIcon</enum></property>
-         <property name="checkable"><bool>true</bool></property>
-         <property name="checked"><bool>true</bool></property>
-         <property name="autoExclusive"><bool>true</bool></property>
+        <widget class="QPushButton" name="btnVideo">
+         <property name="minimumSize">
+          <size>
+           <width>80</width>
+           <height>60</height>
+          </size>
+         </property>
+         <property name="toolTip">
+          <string>Video Comparison</string>
+         </property>
+         <property name="text">
+          <string>Video</string>
+         </property>
+         <property name="checkable">
+          <bool>false</bool>
+         </property>
+         <property name="autoExclusive">
+          <bool>true</bool>
+         </property>
         </widget>
        </item>
-
        <item>
-        <widget class="QToolButton" name="btnVideo">
-         <property name="text"><string>Video</string></property>
-         <property name="toolTip"><string>Video Comparison</string></property>
-         <property name="minimumSize"><size><width>80</width><height>60</height></size></property>
-         <property name="toolButtonStyle"><enum>Qt::ToolButtonTextUnderIcon</enum></property>
-         <property name="checkable"><bool>true</bool></property>
-         <property name="autoExclusive"><bool>true</bool></property>
+        <widget class="QPushButton" name="btnMeasure">
+         <property name="minimumSize">
+          <size>
+           <width>80</width>
+           <height>60</height>
+          </size>
+         </property>
+         <property name="toolTip">
+          <string>Length Measurement</string>
+         </property>
+         <property name="text">
+          <string>Measure</string>
+         </property>
+         <property name="checkable">
+          <bool>false</bool>
+         </property>
+         <property name="autoExclusive">
+          <bool>true</bool>
+         </property>
         </widget>
        </item>
-
-       <item>
-        <widget class="QToolButton" name="btnMeasure">
-         <property name="text"><string>Measure</string></property>
-         <property name="toolTip"><string>Length Measurement</string></property>
-         <property name="minimumSize"><size><width>80</width><height>60</height></size></property>
-         <property name="toolButtonStyle"><enum>Qt::ToolButtonTextUnderIcon</enum></property>
-         <property name="checkable"><bool>true</bool></property>
-         <property name="autoExclusive"><bool>true</bool></property>
-        </widget>
-       </item>
-
        <item>
         <spacer name="sidebarSpacer">
-         <property name="orientation"><enum>Qt::Vertical</enum></property>
-         <property name="sizeHint" stdset="0"><size><width>20</width><height>40</height></size></property>
+         <property name="orientation">
+          <enum>Qt::Orientation::Vertical</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>20</width>
+           <height>40</height>
+          </size>
+         </property>
         </spacer>
        </item>
-
       </layout>
      </widget>
     </item>
-
     <item>
-     <widget class="QStackedWidget" name="stackedWidget">
-      <property name="currentIndex"><number>0</number></property>
-      <widget class="QWidget" name="pageImages"/>
-      <widget class="QWidget" name="pageVideo"/>
-      <widget class="QWidget" name="pageMeasure"/>
+     <widget class="QMdiArea" name="mdiArea">
+      <property name="background">
+       <brush brushstyle="SolidPattern">
+        <color alpha="255">
+         <red>30</red>
+         <green>30</green>
+         <blue>30</blue>
+        </color>
+       </brush>
+      </property>
      </widget>
     </item>
-
    </layout>
   </widget>
-
   <widget class="QMenuBar" name="menubar">
    <property name="geometry">
-    <rect><x>0</x><y>0</y><width>1400</width><height>26</height></rect>
+    <rect>
+     <x>0</x>
+     <y>0</y>
+     <width>1400</width>
+     <height>23</height>
+    </rect>
    </property>
    <widget class="QMenu" name="menuFile">
-    <property name="title"><string>File</string></property>
+    <property name="title">
+     <string>File</string>
+    </property>
     <addaction name="actionOpen"/>
     <addaction name="separator"/>
     <addaction name="actionExportResults"/>
@@ -106,33 +174,45 @@
     <addaction name="actionExit"/>
    </widget>
    <widget class="QMenu" name="menuHelp">
-    <property name="title"><string>Help</string></property>
+    <property name="title">
+     <string>Help</string>
+    </property>
     <addaction name="actionAbout"/>
    </widget>
    <addaction name="menuFile"/>
    <addaction name="menuHelp"/>
   </widget>
-
   <widget class="QStatusBar" name="statusbar"/>
-
   <action name="actionOpen">
-   <property name="text"><string>Open Image…</string></property>
-   <property name="shortcut"><string>Ctrl+O</string></property>
+   <property name="text">
+    <string>Open Image…</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+O</string>
+   </property>
   </action>
   <action name="actionExportResults">
-   <property name="text"><string>Export Results…</string></property>
-   <property name="shortcut"><string>Ctrl+E</string></property>
+   <property name="text">
+    <string>Export Results…</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+E</string>
+   </property>
   </action>
   <action name="actionExit">
-   <property name="text"><string>Exit</string></property>
-   <property name="shortcut"><string>Ctrl+Q</string></property>
+   <property name="text">
+    <string>Exit</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Q</string>
+   </property>
   </action>
   <action name="actionAbout">
-   <property name="text"><string>About</string></property>
+   <property name="text">
+    <string>About</string>
+   </property>
   </action>
-
  </widget>
-
  <resources/>
  <connections/>
 </ui>
