@@ -101,30 +101,49 @@
          </property>
         </widget>
        </item>
-       <item>
-        <widget class="QPushButton" name="btnMeasure">
-         <property name="minimumSize">
-          <size>
-           <width>80</width>
-           <height>60</height>
-          </size>
-         </property>
-         <property name="toolTip">
-          <string>Length Measurement</string>
-         </property>
-         <property name="text">
-          <string>Measure</string>
-         </property>
-         <property name="checkable">
-          <bool>false</bool>
-         </property>
-         <property name="autoExclusive">
-          <bool>true</bool>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <spacer name="sidebarSpacer">
+        <item>
+         <widget class="QPushButton" name="btnMeasure">
+          <property name="minimumSize">
+           <size>
+            <width>80</width>
+            <height>60</height>
+           </size>
+          </property>
+          <property name="toolTip">
+           <string>Length Measurement</string>
+          </property>
+          <property name="text">
+           <string>Measure</string>
+          </property>
+          <property name="checkable">
+           <bool>false</bool>
+          </property>
+          <property name="autoExclusive">
+           <bool>true</bool>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="btnSettings">
+          <property name="minimumSize">
+           <size>
+            <width>80</width>
+            <height>60</height>
+           </size>
+          </property>
+          <property name="toolTip">
+           <string>Settings</string>
+          </property>
+          <property name="text">
+           <string>⚙ Settings</string>
+          </property>
+          <property name="checkable">
+           <bool>false</bool>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <spacer name="sidebarSpacer">
          <property name="orientation">
           <enum>Qt::Orientation::Vertical</enum>
          </property>
