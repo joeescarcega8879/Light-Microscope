@@ -1,6 +1,7 @@
 import os
 import cv2
 import time
+from uuid import uuid4
 from typing import Optional
 from datetime import datetime
 from PyQt6.QtCore import pyqtSlot, QObject, QTimer
@@ -30,6 +31,7 @@ class DeviceCameraPresenter(QObject):
         self.view.connect_requested.connect(self._on_connect_requested)
         self.view.snapshot_requested.connect(self._take_snapshot)
         self.view.recording_requested.connect(self._toggle_recording)
+        self.view.view_closed.connect(self._stop_capture)
 
     def _on_connect_requested(self, camera_index: int):
         if camera_index >= 0:
@@ -87,6 +89,20 @@ class DeviceCameraPresenter(QObject):
 
     def _take_snapshot(self):
         if self._current_pixmap is None:
+            print("No image to save")
+            return
+        
+        take_by_quantity = self.view.get_info_from_ui()
+        if take_by_quantity is not None:
+            quantity = take_by_quantity.get("value")
+            model_name = take_by_quantity.get("model_name")
+            print(f"Taking {quantity} snapshots based on user input.")
+            
+            for i in range(quantity):
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                filename = os.path.join(os.path.expanduser(f"~/Pictures/{model_name}"), f"microscope_{uuid4()}_{i+1}.png")
+                self._current_pixmap.save(filename)
+                print(f"Snapshot {i+1} saved to {filename}")
             return
 
         pictures_dir = os.path.expanduser("~/Pictures")
@@ -94,7 +110,19 @@ class DeviceCameraPresenter(QObject):
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = os.path.join(pictures_dir, f"microscope_{timestamp}.png")
         self._current_pixmap.save(filename)
+        print(f"Snapshot saved to {filename}")
+        
+    def _take_by_custom_quantity(self):
+        
+        if self._current_pixmap is None:
+            print("No image to save")
+            return
+        
+        pictures_dir = os.path.expanduser("~/Pictures/mis_monedas")
+        os.makedirs(pictures_dir, exist_ok=True)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
+    
     def _toggle_recording(self, start: bool):
         if start:
             self._start_recording()

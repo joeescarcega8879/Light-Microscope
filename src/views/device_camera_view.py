@@ -1,9 +1,9 @@
-import glob
-import os
-import platform
 import cv2
+import os
+import glob
+import platform
 from PyQt6 import uic
-from PyQt6.QtCore import pyqtSignal
+from PyQt6.QtCore import pyqtSignal, Qt
 from PyQt6.QtWidgets import QWidget
 from PyQt6.QtGui import QPixmap
 
@@ -14,6 +14,7 @@ class DeviceCameraView(QWidget):
     connect_requested = pyqtSignal(int)
     snapshot_requested = pyqtSignal()
     recording_requested = pyqtSignal(bool)
+    view_closed = pyqtSignal()
 
     def __init__(self):
         super().__init__()
@@ -28,6 +29,17 @@ class DeviceCameraView(QWidget):
         self.btnConnect.toggled.connect(self._on_connect_toggled)
         self.btnSnapshot.clicked.connect(self.snapshot_requested.emit)
         self.btnRecord.toggled.connect(self.recording_requested.emit)
+        
+    def get_info_from_ui(self)-> dict:
+        if self.rdb_by_quantity.isChecked():
+            quantity_text = self.line_quantity.text()
+            model_name = self.line_model_name.text()
+            try:
+                quantity = int(quantity_text)
+                return {"mode": "quantity", "value": quantity, "model_name": model_name}
+            except ValueError:
+                print("Invalid quantity input. Please enter a valid integer.")
+                return None
 
     def _on_connect_toggled(self, checked):
         if self._updating_ui:
@@ -91,10 +103,23 @@ class DeviceCameraView(QWidget):
         self.cmbCamera.setEnabled(not connected)
         self.btnSnapshot.setEnabled(connected)
         self.btnRecord.setEnabled(connected)
+        self.rdb_by_quantity.setEnabled(connected)
+        self.line_quantity.setEnabled(connected)
+        self.line_model_name.setEnabled(connected)
+        
         if not connected:
             self.btnRecord.setChecked(False)
             self.btnRecord.setText("Record")
             self.lblTimer.setVisible(False)
 
     def update_feed(self, pixmap: QPixmap):
-        self.lblFeed.setPixmap(pixmap)
+        scaled = pixmap.scaled(
+            self.lblFeed.size(),
+            Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.SmoothTransformation,
+        )
+        self.lblFeed.setPixmap(scaled)
+
+    def closeEvent(self, event):
+        self.view_closed.emit()
+        super().closeEvent(event)

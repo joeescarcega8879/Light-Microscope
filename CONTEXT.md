@@ -34,10 +34,25 @@ User action → View → Presenter → Model
 - **Models** (`src/models/`) handle data and hardware. No Qt widgets (QThread allowed).
 - **Presenters** (`src/presenters/`) connect signals, call model methods, push results back to view.
 
+## Navigation Pattern
+
+The app uses a **dashboard + standalone windows** pattern. No MDI.
+
+```
+Login → Dashboard (MainView) hidden ──┐
+             ↑                        │ button click
+             │ view_closed signal     ↓
+             └──────────── Secondary view (standalone QWidget window)
+```
+
+- `MainApplication` owns the show/hide logic. When a secondary view opens, the dashboard calls `hide()`; when the view emits `view_closed` (from `closeEvent`), the dashboard calls `show()` again.
+- Every secondary view **must** declare `view_closed = pyqtSignal()` and emit it in `closeEvent`.
+- `SettingsView` is a `QDialog` (modal) — no hide/show needed.
+
 ## File Map
 
 ```
-main_application.py             # Entry point: creates QApplication, runs login → main window flow
+main_application.py             # Entry point: QApplication, login → dashboard flow, opens all secondary views
 
 src/
 ├── assets/
@@ -48,48 +63,125 @@ src/
 │       └── high_contrast.qss    # High contrast (black bg, #ffd700 accent)
 │
 ├── models/
-│   ├── device_camera_startup.py # QThread: opens cv2.VideoCapture, emits change_pixmap_signal(QPixmap)
+│   ├── device_camera_startup.py # QThread: opens cv2.VideoCapture, emits change_pixmap_signal(QPixmap) and raw_frame_signal
+│   ├── yolo_trainer.py          # QThread: runs YOLOv8 training via ultralytics; emits epoch_ended, training_finished, training_failed, log_message
 │   └── image_model.py           # Stub: will load images/video, run diff, heatmap, measurement
 │
 ├── presenters/
-│   ├── login_presenter.py       # Wires LoginView.login_requested → on_login_success callback
-│   ├── main_presenter.py        # Connects MainView signals → MainApplication methods
-│   ├── device_camera_presenter.py # Full camera: connect, snapshot, recording, FPS
-│   ├── comparison_presenter.py  # Empty stub
-│   └── settings_presenter.py    # Wires SettingsView → ThemeManager.apply_theme()
+│   ├── login_presenter.py              # Wires LoginView.login_requested → on_login_success callback
+│   ├── main_presenter.py               # Connects MainView signals → MainApplication methods
+│   ├── device_camera_presenter.py      # Full camera: connect, snapshot, recording, FPS; stops capture on view_closed
+│   ├── image_comparison_presenter.py   # Loads images, runs compute_diff + draw_contours, calls main_app.open_comparison_result_view()
+│   ├── yolo_studio_presenter.py        # Annotation: load folder, navigate images, draw/save YOLO labels; Training: prepare dataset, launch YoloTrainer
+│   └── settings_presenter.py           # Wires SettingsView → ThemeManager.apply_theme()
 │
 ├── utils/
-│   ├── image_utils.py           # TypeCapture(Enum), TypePlatform(Enum); diff helpers pending
+│   ├── image_utils.py           # ImageUtils: compute_diff(), draw_contours(), qpixmap_to_numpy(), open_image_file_dialog(); TypeCapture/TypePlatform enums
+│   ├── yolo_utils.py            # YoloUtils: load_labels(), save_labels(), prepare_dataset(), load_class_names(), save_class_names()
 │   └── theme_manager.py         # Scans assets/css/*.qss, applies QSS to QApplication.instance()
 │
 └── views/
-    ├── main_view.py             # MainView(QMainWindow): loads main_window.ui, emits signals for all sidebar buttons
-    ├── login_view.py            # LoginView: loads login.ui, emits login_requested on btnLogin
-    ├── device_camera_view.py    # DeviceCameraView: full camera UI with combo population, connect/snapshot/record
-    ├── settings_view.py         # SettingsView(QDialog): modal theme selector with Apply/Cancel
-    ├── image_panel.py           # Empty stub (CanvasLabel for measurement clicks)
+    ├── main_view.py                    # MainView(QMainWindow): loads main_window.ui (dashboard grid), emits signals for all buttons
+    ├── login_view.py                   # LoginView: loads login.ui, emits login_requested on btnLogin
+    ├── device_camera_view.py           # DeviceCameraView: camera UI, emits view_closed on close
+    ├── settings_view.py                # SettingsView(QDialog): modal theme selector with Apply/Cancel
+    ├── image_comparison_view.py        # ImageComparisonView: loads A/B images, slider, Compare button; emits view_closed
+    ├── image_comparison_result_view.py # ImageComparisonResultView: shows diff (grayscale), heatmap (JET), contours (green on img A), stats, Save button
+    ├── yolo_studio_view.py             # YoloStudioView: two-tab UI (Annotate + Train); contains LabelingCanvas (custom QWidget)
     └── ui/
-        ├── main_window.ui              # QMainWindow: sidebar (Images, Video, Measure, Settings) + QMdiArea
-        ├── login.ui                    # QWidget: username, password, show-pwd checkbox, error label
-        ├── camera_view_widget.ui       # QWidget: cmbCamera, btnConnect, lblFeed, btnSnapshot, btnRecord, lblTimer
-        ├── settings_dialog.ui          # QDialog: theme title, QGroupBox with QComboBox, preview, Apply/Cancel
-        ├── image_comparison_widget.ui  # Two image slots, diff + heatmap results
-        ├── video_comparison_widget.ui  # Video loader, two frame pickers, diff/heatmap output
-        └── length_measurement_widget.ui # Canvas + scale calibration + measurements table
+        ├── main_window.ui                      # QMainWindow: dashboard grid (Images, Video, Measure, AI Studio, Settings)
+        ├── login.ui                            # QWidget: username, password, show-pwd checkbox, error label
+        ├── camera_view_widget.ui               # QWidget: cmbCamera, btnConnect, lblFeed, btnSnapshot, btnRecord, lblTimer
+        ├── settings_dialog.ui                  # QDialog: theme title, QGroupBox with QComboBox, preview, Apply/Cancel
+        ├── image_comparison_widget.ui          # lblImageA/B, btnLoadA/B, btnCompare, sliderThreshold, lblThresholdValue
+        ├── image_comparison_result_widget.ui   # lblDiff, lblHeatmap, lblContours, lblStats, btnSaveResult
+        ├── yolo_studio_widget.ui               # Two-tab QWidget: Annotate (canvasFrame, lstClasses, lstAnnotations) + Train (model, epochs, val split, progress, log)
+        ├── video_comparison_widget.ui          # Video loader, two frame pickers, diff/heatmap output
+        └── length_measurement_widget.ui        # Canvas + scale calibration + measurements table
 ```
 
-## Main Window Flow
+## Application Flow
 
 ```
 QApplication
   └── MainApplication (creates ThemeManager, applies "light" theme on startup)
-        ├── LoginView (QWidget shown as top-level window, already themed)
-        │     └── LoginPresenter → on_login_success()
-        └── MainView (QMainWindow with QMdiArea)
-              ├── btnVideo   → opens DeviceCameraView as QMdiSubWindow  [DONE]
-              ├── btnImages  → reserved for ImageComparisonWidget        [NOT WIRED]
-              ├── btnMeasure → reserved for LengthMeasurementWidget      [NOT WIRED]
-              └── btnSettings → opens SettingsView as QDialog modal      [DONE]
+        ├── LoginView (top-level window)
+        │     └── LoginPresenter → _initialize_main_window()
+        └── MainView — Dashboard (2×2 button grid, no MDI)
+              ├── btnVideo    → hides dashboard → opens DeviceCameraView (standalone)     [DONE]
+              ├── btnImages   → hides dashboard → opens ImageComparisonView (standalone)  [DONE]
+              │                                         └── btnCompare → opens ImageComparisonResultView (standalone, on top)
+              ├── btnMeasure  → reserved for LengthMeasurementView                        [NOT WIRED]
+              ├── btnAiStudio → hides dashboard → opens YoloStudioView (standalone)       [DONE]
+              └── btnSettings → opens SettingsView as QDialog modal (no hide)             [DONE]
+```
+
+## Image Comparison Flow
+
+```
+ImageComparisonView
+  (load A, load B, set threshold, click Compare)
+        ↓ compare_images_requested signal
+  ImageComparisonPresenter._process_images()
+        ↓ ImageUtils.compute_diff()  → (diff, binary_mask, heatmap)
+        ↓ ImageUtils.draw_contours() → contour_img (img_a + green contours)
+        ↓ computes stats: changed px / total px (%)
+        ↓ main_app.open_comparison_result_view(diff, heatmap, contour_img, stats_text)
+  ImageComparisonResultView
+        ├── lblDiff     — grayscale absolute difference
+        ├── lblHeatmap  — JET colormap heatmap
+        ├── lblContours — Image A with green contours of differing regions
+        ├── lblStats    — "Changed pixels: N / M  (X%)"
+        └── btnSaveResult — saves heatmap pixmap via QFileDialog
+```
+
+## ImageUtils API
+
+| Method | Signature | Returns |
+|---|---|---|
+| `compute_diff` | `(img_a, img_b, threshold=0)` | `(diff: uint8 2D, binary_mask: uint8 2D, heatmap: uint8 3D BGR)` |
+| `draw_contours` | `(base_img, binary_mask, color=(0,255,0), thickness=2)` | `np.ndarray BGR` — copy of base_img with contours drawn |
+| `qpixmap_to_numpy` | `(pixmap: QPixmap)` | `np.ndarray BGR` |
+| `open_image_file_dialog` | `()` | `str` file path |
+
+## YoloUtils API
+
+| Method | Signature | Returns |
+|---|---|---|
+| `load_labels` | `(label_path: str)` | `list[tuple]` — list of `(class_id, cx, cy, w, h)` |
+| `save_labels` | `(labels: list[tuple], label_path: str)` | `None` — writes YOLO `.txt` format |
+| `prepare_dataset` | `(source_dir, class_names, val_split=0.2)` | `str` — path to generated `data.yaml` |
+| `load_class_names` | `(source_dir: str)` | `list[str]` — reads `classes.txt`, empty list if not found |
+| `save_class_names` | `(class_names: list[str], source_dir: str)` | `None` — writes `classes.txt` |
+
+## AI Studio Flow
+
+```
+YoloStudioView (two tabs)
+  │
+  ├── Tab: Annotate
+  │     LabelingCanvas (custom QWidget — draw bounding boxes with mouse)
+  │       ├── mousePressEvent / mouseMoveEvent / mouseReleaseEvent → drag-to-draw rect
+  │       ├── Converts screen rect → YOLO normalized coords (cx, cy, w, h)
+  │       ├── Per-class color palette (8 colors, cycles)
+  │       └── annotation_added / annotation_removed signals
+  │     Controls: btnLoadFolder, btnPrev, btnNext, btnSaveLabels
+  │               lstClasses (add/remove), lineClassName, btnAddClass, btnRemoveClass
+  │               lstAnnotations, btnDeleteAnnotation
+  │
+  └── Tab: Train
+        cmbModel     — YOLOv8 Nano | YOLOv8 Small
+        sliderEpochs / sliderValSplit (with live labels)
+        lineDatasetPath / lineOutputDir (auto-filled from Annotate tab)
+        btnStartTraining → YoloStudioPresenter._start_training()
+              ↓ YoloUtils.prepare_dataset() → yolo_dataset/data.yaml
+              ↓ YoloTrainer(QThread).start()
+                    ↓ ultralytics YOLO.train() with on_train_epoch_end callback
+                    ↓ epoch_ended → view.set_training_progress()
+                    ↓ log_message → view.append_log()
+                    ↓ training_finished(best.pt path) → view.set_training_finished()
+                    ↓ training_failed(msg)            → view.set_training_failed()
+        btnOpenModelFolder → xdg-open output_dir/run
 ```
 
 ## UI / Styling
@@ -99,10 +191,12 @@ QApplication
 - Theme applied to `QApplication.instance().setStyleSheet()` so it covers all widgets including login.
 - Adding a new theme: create a new `.qss` file in `src/assets/css/` — `ThemeManager` detects it automatically.
 - Key `objectName` values (CSS selectors):
-  - Sidebar: `#sidebar`, `#btnImages`, `#btnVideo`, `#btnMeasure`, `#btnSettings`
+  - Dashboard: `#btnImages`, `#btnVideo`, `#btnMeasure`, `#btnAiStudio`, `#btnSettings`, `#lblTitle`, `#lblSubtitle`
   - Camera: `#cmbCamera`, `#btnConnect`, `#lblFeed`, `#btnSnapshot`, `#btnRecord`, `#lblTimer`, `#lblFps`, `#lblResolution`
   - Login: `#lineEditUsername`, `#lineEditPassword`, `#chkShowPassword`, `#lblError`, `#btnLogin`
   - Settings: `#cmbTheme`, `#btnApply`, `#btnCancel`
+  - Image comparison: `#btnLoadA`, `#btnLoadB`, `#btnCompare`, `#sliderThreshold`, `#lblThresholdValue`
+  - Comparison results: `#lblDiff`, `#lblHeatmap`, `#lblContours`, `#lblStats`, `#btnSaveResult`
 
 ## Key Constraints
 
@@ -111,49 +205,57 @@ QApplication
 - **`.ui` files are the source of truth for layout.**
 - **Camera capture runs on a QThread** (`DeviceCameraStartup`). Frame emission must happen inside `run()`, not called from the presenter on the main thread.
 - **Themes are `.qss` files in `src/assets/css/`**, not inline styles or Python strings.
+- **Every secondary view must emit `view_closed` in `closeEvent`** so `MainApplication` can show the dashboard again.
 
 ## Current State (June 2026)
 
 | Component | Status |
 |---|---|
-| `main_application.py` | Done |
+| `main_application.py` | Done — login flow, dashboard, opens all secondary views, `open_comparison_result_view()` |
 | `login.ui` + `LoginView` | Done |
 | `LoginPresenter` | Done — no credential validation yet |
-| `main_window.ui` + `MainView` | Done — sidebar with Images, Video, Measure, Settings + QMdiArea |
-| `MainPresenter` | Done — connects video and settings signals |
-| `camera_view_widget.ui` | Done |
-| `DeviceCameraView` | Done — camera enumeration, connect/disconnect, snapshot, recording |
+| `main_window.ui` + `MainView` | Done — 2×2 dashboard grid, no MDI |
+| `MainPresenter` | Done — connects video, image comparison, and settings signals |
+| `camera_view_widget.ui` + `DeviceCameraView` | Done — camera enumeration, connect/disconnect, snapshot, recording, `view_closed` |
 | `DeviceCameraStartup` (QThread) | Done — capture loop inside `run()`, emits pixmap and raw frames |
-| `DeviceCameraPresenter` | Done — full camera lifecycle, FPS display, snapshot to `~/Pictures`, recording with timer |
+| `DeviceCameraPresenter` | Done — full camera lifecycle, FPS display, snapshot to `~/Pictures`, recording with timer, stops capture on `view_closed` |
 | `ThemeManager` | Done — scans `*.qss` from `assets/css/`, applies globally |
 | `settings_dialog.ui` + `SettingsView` | Done — QDialog modal with theme combo and Apply/Cancel |
-| `SettingsPresenter` | Done — connects view selection → `ThemeManager.apply_theme()` |
+| `SettingsPresenter` | Done |
 | `light.qss`, `dark.qss`, `blue.qss`, `high_contrast.qss` | Done — 4 themes, Light applied by default |
-| `image_comparison_widget.ui` | Done |
-| `video_comparison_widget.ui` | Done |
-| `length_measurement_widget.ui` | Done |
+| `image_comparison_widget.ui` + `ImageComparisonView` | Done — loads A/B, slider with live label, Compare, `view_closed` |
+| `image_comparison_result_widget.ui` + `ImageComparisonResultView` | Done — diff, heatmap, contours panels, stats, Save button |
+| `ImageComparisonPresenter` | Done — null guard, compute_diff, draw_contours, stats, opens result view |
+| `ImageUtils` | Done — `compute_diff()`, `draw_contours()`, `qpixmap_to_numpy()`, `open_image_file_dialog()` |
+| `yolo_studio_widget.ui` + `YoloStudioView` | Done — two-tab UI, `LabelingCanvas` custom widget, `view_closed` |
+| `YoloStudioPresenter` | Done — folder loading, image navigation, label save/load, class management, training launch |
+| `YoloTrainer` (QThread) | Done — ultralytics YOLOv8 training, epoch callbacks, emits progress/finished/failed signals |
+| `YoloUtils` | Done — `load_labels()`, `save_labels()`, `prepare_dataset()`, `load_class_names()`, `save_class_names()` |
+| `video_comparison_widget.ui` | UI file exists, no view/presenter yet |
+| `length_measurement_widget.ui` | UI file exists, no view/presenter yet |
 | `ImageModel` | Stub |
-| `ComparisonPresenter` | Empty |
-| `image_panel.py` (CanvasLabel) | Empty |
 
 ## Pending Work
 
-### Image Comparison module (btnImages)
-- [ ] Implement `ImageModel`: load with OpenCV, compute per-pixel diff, heatmap colormap.
-- [ ] Implement `image_utils.py` helper functions.
-- [ ] Create `ImageComparisonView` that loads `image_comparison_widget.ui`.
-- [ ] Implement `ComparisonPresenter`.
-- [ ] Wire `MainView.btnImages` → `MainPresenter` → `MainApplication`.
+### Video Capture module
+- [ ] `btnVideo` currently opens `DeviceCameraView` (live feed). Decide: keep as live camera or replace with video comparison.
 
 ### Video Comparison module
-- [ ] Create `VideoComparisonView` that loads `video_comparison_widget.ui`.
+- [ ] Create `VideoComparisonView` loading `video_comparison_widget.ui`.
 - [ ] Create `VideoComparisonPresenter`.
+- [ ] Wire `MainView.btnVideo` → `MainApplication`.
+- [ ] Add `view_closed` signal to the view.
 
-### Length Measurement module (btnMeasure)
-- [ ] Implement `CanvasLabel` (promoted widget with mouse-click tracking) in `image_panel.py`.
-- [ ] Create `LengthMeasurementView` that loads `length_measurement_widget.ui`.
+### Length Measurement module (btnMeasure — not wired)
+- [ ] Create `image_panel.py` with `CanvasLabel(QLabel)` — override `mousePressEvent` to record clicked points.
+- [ ] Create `LengthMeasurementView` loading `length_measurement_widget.ui`.
 - [ ] Create `LengthMeasurementPresenter`.
-- [ ] Wire `MainView.btnMeasure` → `MainPresenter` → `MainApplication`.
+- [ ] Wire `MainView.btnMeasure` in `MainPresenter` and `MainApplication`.
+- [ ] Add `view_closed` signal to the view.
 
 ### Auth
 - [ ] Add credential validation to `LoginPresenter._handle_login` (currently lets anyone in).
+
+### Known issues
+- [ ] `ImageComparisonResultView._save_result()` hardcodes `~/Pictures/mis_monedas` as the save directory — should use `~/Pictures` or be configurable.
+- [ ] `src/presenters/comparison_presenter.py` is an empty (0-byte) file — dead code, should be deleted.

@@ -26,10 +26,14 @@ class DeviceCameraStartup(QThread):
         try:
             if os_name == TypePlatform.Windows.value:
                 cap = cv2.VideoCapture(self.camera_index, cv2.CAP_DSHOW)
-                cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+                cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1368)
                 cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+                
             elif os_name == TypePlatform.Linux.value:
                 cap = cv2.VideoCapture(self.camera_index, cv2.CAP_V4L2)
+                cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1368)
+                cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+                
             else:
                 cap = cv2.VideoCapture(self.camera_index)
 

@@ -6,170 +6,162 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1400</width>
-    <height>900</height>
+    <width>862</width>
+    <height>640</height>
    </rect>
   </property>
   <property name="windowTitle">
    <string>Light Microscope</string>
   </property>
   <widget class="QWidget" name="centralwidget">
-   <layout class="QHBoxLayout" name="rootLayout">
+   <layout class="QVBoxLayout" name="rootLayout">
     <property name="spacing">
-     <number>0</number>
+     <number>24</number>
     </property>
     <property name="leftMargin">
-     <number>0</number>
+     <number>80</number>
     </property>
     <property name="topMargin">
-     <number>0</number>
+     <number>60</number>
     </property>
     <property name="rightMargin">
-     <number>0</number>
+     <number>80</number>
     </property>
     <property name="bottomMargin">
-     <number>0</number>
+     <number>60</number>
     </property>
     <item>
-     <widget class="QFrame" name="sidebar">
-      <property name="minimumSize">
-       <size>
-        <width>220</width>
-        <height>0</height>
-       </size>
+     <widget class="QLabel" name="lblTitle">
+      <property name="text">
+       <string>Light Microscope</string>
       </property>
-      <layout class="QVBoxLayout" name="sidebarLayout">
-       <property name="spacing">
-        <number>4</number>
-       </property>
-       <property name="leftMargin">
-        <number>1</number>
-       </property>
-       <property name="topMargin">
-        <number>12</number>
-       </property>
-       <property name="rightMargin">
-        <number>1</number>
-       </property>
-       <property name="bottomMargin">
-        <number>12</number>
-       </property>
-       <item>
-        <widget class="QPushButton" name="btnImages">
-         <property name="minimumSize">
-          <size>
-           <width>80</width>
-           <height>60</height>
-          </size>
-         </property>
-         <property name="toolTip">
-          <string>Image Comparison</string>
-         </property>
-         <property name="text">
-          <string>Images</string>
-         </property>
-         <property name="checkable">
-          <bool>false</bool>
-         </property>
-         <property name="checked">
-          <bool>false</bool>
-         </property>
-         <property name="autoExclusive">
-          <bool>true</bool>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QPushButton" name="btnVideo">
-         <property name="minimumSize">
-          <size>
-           <width>80</width>
-           <height>60</height>
-          </size>
-         </property>
-         <property name="toolTip">
-          <string>Video Comparison</string>
-         </property>
-         <property name="text">
-          <string>Video</string>
-         </property>
-         <property name="checkable">
-          <bool>false</bool>
-         </property>
-         <property name="autoExclusive">
-          <bool>true</bool>
-         </property>
-        </widget>
-       </item>
-        <item>
-         <widget class="QPushButton" name="btnMeasure">
-          <property name="minimumSize">
-           <size>
-            <width>80</width>
-            <height>60</height>
-           </size>
-          </property>
-          <property name="toolTip">
-           <string>Length Measurement</string>
-          </property>
-          <property name="text">
-           <string>Measure</string>
-          </property>
-          <property name="checkable">
-           <bool>false</bool>
-          </property>
-          <property name="autoExclusive">
-           <bool>true</bool>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <widget class="QPushButton" name="btnSettings">
-          <property name="minimumSize">
-           <size>
-            <width>80</width>
-            <height>60</height>
-           </size>
-          </property>
-          <property name="toolTip">
-           <string>Settings</string>
-          </property>
-          <property name="text">
-           <string>⚙ Settings</string>
-          </property>
-          <property name="checkable">
-           <bool>false</bool>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <spacer name="sidebarSpacer">
-         <property name="orientation">
-          <enum>Qt::Orientation::Vertical</enum>
-         </property>
-         <property name="sizeHint" stdset="0">
-          <size>
-           <width>20</width>
-           <height>40</height>
-          </size>
-         </property>
-        </spacer>
-       </item>
-      </layout>
+      <property name="alignment">
+       <set>Qt::AlignmentFlag::AlignCenter</set>
+      </property>
      </widget>
     </item>
     <item>
-     <widget class="QMdiArea" name="mdiArea">
-      <property name="background">
-       <brush brushstyle="SolidPattern">
-        <color alpha="255">
-         <red>30</red>
-         <green>30</green>
-         <blue>30</blue>
-        </color>
-       </brush>
+     <widget class="QLabel" name="lblSubtitle">
+      <property name="text">
+       <string>Select a module to get started</string>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignmentFlag::AlignCenter</set>
       </property>
      </widget>
+    </item>
+    <item>
+     <spacer name="topSpacer">
+      <property name="orientation">
+       <enum>Qt::Orientation::Vertical</enum>
+      </property>
+      <property name="sizeHint" stdset="0">
+       <size>
+        <width>20</width>
+        <height>20</height>
+       </size>
+      </property>
+     </spacer>
+    </item>
+    <item>
+     <layout class="QGridLayout" name="dashboardGrid">
+      <property name="spacing">
+       <number>20</number>
+      </property>
+      <item row="0" column="0">
+       <widget class="QPushButton" name="btnImages">
+        <property name="minimumSize">
+         <size>
+          <width>220</width>
+          <height>160</height>
+         </size>
+        </property>
+        <property name="toolTip">
+         <string>Image Comparison</string>
+        </property>
+        <property name="text">
+         <string>Compare Images</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="1">
+       <widget class="QPushButton" name="btnSettings">
+        <property name="minimumSize">
+         <size>
+          <width>220</width>
+          <height>160</height>
+         </size>
+        </property>
+        <property name="toolTip">
+         <string>Settings</string>
+        </property>
+        <property name="text">
+         <string>Settings</string>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="2">
+       <widget class="QPushButton" name="btnAiStudio">
+        <property name="minimumSize">
+         <size>
+          <width>220</width>
+          <height>160</height>
+         </size>
+        </property>
+        <property name="toolTip">
+         <string>AI Studio — Annotate &amp; Train YOLO models</string>
+        </property>
+        <property name="text">
+         <string>AI Studio</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="0">
+       <widget class="QPushButton" name="btnMeasure">
+        <property name="minimumSize">
+         <size>
+          <width>220</width>
+          <height>160</height>
+         </size>
+        </property>
+        <property name="toolTip">
+         <string>Length Measurement</string>
+        </property>
+        <property name="text">
+         <string>Measure</string>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="1">
+       <widget class="QPushButton" name="btnVideo">
+        <property name="minimumSize">
+         <size>
+          <width>220</width>
+          <height>160</height>
+         </size>
+        </property>
+        <property name="toolTip">
+         <string>Video Capture</string>
+        </property>
+        <property name="text">
+         <string>Create Videos and Images</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </item>
+    <item>
+     <spacer name="bottomSpacer">
+      <property name="orientation">
+       <enum>Qt::Orientation::Vertical</enum>
+      </property>
+      <property name="sizeHint" stdset="0">
+       <size>
+        <width>20</width>
+        <height>20</height>
+       </size>
+      </property>
+     </spacer>
     </item>
    </layout>
   </widget>
@@ -178,7 +170,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>1400</width>
+     <width>862</width>
      <height>23</height>
     </rect>
    </property>
@@ -186,10 +178,6 @@
     <property name="title">
      <string>File</string>
     </property>
-    <addaction name="actionOpen"/>
-    <addaction name="separator"/>
-    <addaction name="actionExportResults"/>
-    <addaction name="separator"/>
     <addaction name="actionExit"/>
    </widget>
    <widget class="QMenu" name="menuHelp">
@@ -202,22 +190,6 @@
    <addaction name="menuHelp"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
-  <action name="actionOpen">
-   <property name="text">
-    <string>Open Image…</string>
-   </property>
-   <property name="shortcut">
-    <string>Ctrl+O</string>
-   </property>
-  </action>
-  <action name="actionExportResults">
-   <property name="text">
-    <string>Export Results…</string>
-   </property>
-   <property name="shortcut">
-    <string>Ctrl+E</string>
-   </property>
-  </action>
   <action name="actionExit">
    <property name="text">
     <string>Exit</string>

@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>ImageComparisonResultWidget</class>
+ <widget class="QWidget" name="ImageComparisonResultWidget">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>1080</width>
+    <height>420</height>
+   </rect>
+  </property>
+  <layout class="QVBoxLayout" name="mainLayout">
+   <property name="spacing">
+    <number>12</number>
+   </property>
+   <property name="leftMargin">
+    <number>16</number>
+   </property>
+   <property name="topMargin">
+    <number>16</number>
+   </property>
+   <property name="rightMargin">
+    <number>16</number>
+   </property>
+   <property name="bottomMargin">
+    <number>16</number>
+   </property>
+   <item>
+    <layout class="QHBoxLayout" name="resultsLayout">
+     <property name="spacing">
+      <number>12</number>
+     </property>
+     <item>
+      <widget class="QGroupBox" name="groupDiff">
+       <property name="title">
+        <string>Differences</string>
+       </property>
+       <layout class="QVBoxLayout" name="layoutDiff">
+        <item>
+         <widget class="QLabel" name="lblDiff">
+          <property name="minimumSize">
+           <size>
+            <width>310</width>
+            <height>300</height>
+           </size>
+          </property>
+          <property name="text">
+           <string>—</string>
+          </property>
+          <property name="scaledContents">
+           <bool>true</bool>
+          </property>
+          <property name="alignment">
+           <set>Qt::AlignmentFlag::AlignCenter</set>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+     </item>
+     <item>
+      <widget class="QGroupBox" name="groupHeatmap">
+       <property name="title">
+        <string>Diff Heatmap</string>
+       </property>
+       <layout class="QVBoxLayout" name="layoutHeatmap">
+        <item>
+         <widget class="QLabel" name="lblHeatmap">
+          <property name="minimumSize">
+           <size>
+            <width>310</width>
+            <height>300</height>
+           </size>
+          </property>
+          <property name="text">
+           <string>—</string>
+          </property>
+          <property name="scaledContents">
+           <bool>true</bool>
+          </property>
+          <property name="alignment">
+           <set>Qt::AlignmentFlag::AlignCenter</set>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+     </item>
+     <item>
+      <widget class="QGroupBox" name="groupContours">
+       <property name="title">
+        <string>Contours</string>
+       </property>
+       <layout class="QVBoxLayout" name="layoutContours">
+        <item>
+         <widget class="QLabel" name="lblContours">
+          <property name="minimumSize">
+           <size>
+            <width>310</width>
+            <height>300</height>
+           </size>
+          </property>
+          <property name="text">
+           <string>—</string>
+          </property>
+          <property name="scaledContents">
+           <bool>true</bool>
+          </property>
+          <property name="alignment">
+           <set>Qt::AlignmentFlag::AlignCenter</set>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+     </item>
+    </layout>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="footerLayout">
+     <property name="spacing">
+      <number>10</number>
+     </property>
+     <item>
+      <widget class="QLabel" name="lblStats">
+       <property name="text">
+        <string/>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <spacer name="footerSpacer">
+       <property name="orientation">
+        <enum>Qt::Orientation::Horizontal</enum>
+       </property>
+       <property name="sizeHint" stdset="0">
+        <size>
+         <width>40</width>
+         <height>20</height>
+        </size>
+       </property>
+      </spacer>
+     </item>
+     <item>
+      <widget class="QPushButton" name="btnSaveResult">
+       <property name="text">
+        <string>Save Result…</string>
+       </property>
+      </widget>
+     </item>
+    </layout>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

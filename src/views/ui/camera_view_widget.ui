@@ -3,130 +3,211 @@
  <class>CameraViewWidget</class>
  <widget class="QWidget" name="CameraViewWidget">
   <property name="geometry">
-   <rect><x>0</x><y>0</y><width>960</width><height>640</height></rect>
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>960</width>
+    <height>640</height>
+   </rect>
   </property>
   <property name="windowTitle">
    <string>Live Camera</string>
   </property>
-
   <layout class="QVBoxLayout" name="mainLayout">
-   <property name="spacing"><number>8</number></property>
-   <property name="leftMargin"><number>12</number></property>
-   <property name="topMargin"><number>10</number></property>
-   <property name="rightMargin"><number>12</number></property>
-   <property name="bottomMargin"><number>10</number></property>
-
+   <property name="spacing">
+    <number>8</number>
+   </property>
+   <property name="leftMargin">
+    <number>12</number>
+   </property>
+   <property name="topMargin">
+    <number>10</number>
+   </property>
+   <property name="rightMargin">
+    <number>12</number>
+   </property>
+   <property name="bottomMargin">
+    <number>10</number>
+   </property>
    <item>
     <layout class="QHBoxLayout" name="topBarLayout">
-     <property name="spacing"><number>8</number></property>
-
+     <property name="spacing">
+      <number>8</number>
+     </property>
      <item>
       <widget class="QLabel" name="lblCameraSelector">
-       <property name="text"><string>Camera:</string></property>
+       <property name="text">
+        <string>Camera:</string>
+       </property>
       </widget>
      </item>
-
      <item>
       <widget class="QComboBox" name="cmbCamera">
-       <property name="minimumWidth"><number>160</number></property>
-       <property name="toolTip"><string>Select camera device</string></property>
+       <property name="toolTip">
+        <string>Select camera device</string>
+       </property>
       </widget>
      </item>
-
      <item>
       <widget class="QPushButton" name="btnConnect">
-       <property name="text"><string>Connect</string></property>
-       <property name="minimumHeight"><number>32</number></property>
-       <property name="minimumWidth"><number>100</number></property>
-       <property name="checkable"><bool>true</bool></property>
-       <property name="toolTip"><string>Connect / Disconnect camera</string></property>
+       <property name="toolTip">
+        <string>Connect / Disconnect camera</string>
+       </property>
+       <property name="text">
+        <string>Connect</string>
+       </property>
+       <property name="checkable">
+        <bool>true</bool>
+       </property>
       </widget>
      </item>
-
      <item>
       <spacer name="topSpacer">
-       <property name="orientation"><enum>Qt::Horizontal</enum></property>
-       <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
+       <property name="orientation">
+        <enum>Qt::Orientation::Horizontal</enum>
+       </property>
+       <property name="sizeHint" stdset="0">
+        <size>
+         <width>40</width>
+         <height>20</height>
+        </size>
+       </property>
       </spacer>
      </item>
-
      <item>
       <widget class="QLabel" name="lblFps">
-       <property name="text"><string>FPS: --</string></property>
-       <property name="alignment"><set>Qt::AlignRight|Qt::AlignVCenter</set></property>
-       <property name="minimumWidth"><number>70</number></property>
+       <property name="text">
+        <string>FPS: --</string>
+       </property>
+       <property name="alignment">
+        <set>Qt::AlignmentFlag::AlignRight|Qt::AlignmentFlag::AlignTrailing|Qt::AlignmentFlag::AlignVCenter</set>
+       </property>
       </widget>
      </item>
-
      <item>
       <widget class="QLabel" name="lblResolution">
-       <property name="text"><string>-- x --</string></property>
-       <property name="alignment"><set>Qt::AlignRight|Qt::AlignVCenter</set></property>
-       <property name="minimumWidth"><number>90</number></property>
+       <property name="text">
+        <string>-- x --</string>
+       </property>
+       <property name="alignment">
+        <set>Qt::AlignmentFlag::AlignRight|Qt::AlignmentFlag::AlignTrailing|Qt::AlignmentFlag::AlignVCenter</set>
+       </property>
       </widget>
      </item>
-
     </layout>
    </item>
-
    <item>
     <widget class="QLabel" name="lblFeed">
-     <property name="text"><string>No camera connected</string></property>
-     <property name="alignment"><set>Qt::AlignCenter</set></property>
-     <property name="scaledContents"><bool>false</bool></property>
      <property name="sizePolicy">
       <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
        <horstretch>0</horstretch>
        <verstretch>0</verstretch>
       </sizepolicy>
      </property>
+     <property name="text">
+      <string>No camera connected</string>
+     </property>
+     <property name="scaledContents">
+      <bool>false</bool>
+     </property>
+     <property name="alignment">
+      <set>Qt::AlignmentFlag::AlignCenter</set>
+     </property>
     </widget>
    </item>
-
    <item>
     <layout class="QHBoxLayout" name="bottomBarLayout">
-     <property name="spacing"><number>8</number></property>
-
+     <property name="spacing">
+      <number>8</number>
+     </property>
+     <item>
+      <widget class="QRadioButton" name="rdb_by_quantity">
+       <property name="enabled">
+        <bool>false</bool>
+       </property>
+       <property name="text">
+        <string>Snapshots by Quantity</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QLineEdit" name="line_quantity">
+       <property name="enabled">
+        <bool>false</bool>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QLabel" name="label">
+       <property name="text">
+        <string>Model Name:</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QLineEdit" name="line_model_name">
+       <property name="enabled">
+        <bool>false</bool>
+       </property>
+      </widget>
+     </item>
      <item>
       <widget class="QPushButton" name="btnSnapshot">
-       <property name="text"><string>Snapshot</string></property>
-       <property name="minimumHeight"><number>36</number></property>
-       <property name="minimumWidth"><number>110</number></property>
-       <property name="toolTip"><string>Save current frame as image</string></property>
-       <property name="enabled"><bool>false</bool></property>
+       <property name="enabled">
+        <bool>false</bool>
+       </property>
+       <property name="toolTip">
+        <string>Save current frame as image</string>
+       </property>
+       <property name="text">
+        <string>Snapshot</string>
+       </property>
       </widget>
      </item>
-
      <item>
       <widget class="QPushButton" name="btnRecord">
-       <property name="text"><string>Record</string></property>
-       <property name="minimumHeight"><number>36</number></property>
-       <property name="minimumWidth"><number>110</number></property>
-       <property name="checkable"><bool>true</bool></property>
-       <property name="toolTip"><string>Start / Stop recording</string></property>
-       <property name="enabled"><bool>false</bool></property>
+       <property name="enabled">
+        <bool>false</bool>
+       </property>
+       <property name="toolTip">
+        <string>Start / Stop recording</string>
+       </property>
+       <property name="text">
+        <string>Record</string>
+       </property>
+       <property name="checkable">
+        <bool>true</bool>
+       </property>
       </widget>
      </item>
-
      <item>
       <widget class="QLabel" name="lblTimer">
-       <property name="text"><string>00:00</string></property>
-       <property name="minimumWidth"><number>60</number></property>
-       <property name="alignment"><set>Qt::AlignLeft|Qt::AlignVCenter</set></property>
-       <property name="visible"><bool>false</bool></property>
+       <property name="visible">
+        <bool>false</bool>
+       </property>
+       <property name="text">
+        <string>00:00</string>
+       </property>
+       <property name="alignment">
+        <set>Qt::AlignmentFlag::AlignLeading|Qt::AlignmentFlag::AlignLeft|Qt::AlignmentFlag::AlignVCenter</set>
+       </property>
       </widget>
      </item>
-
      <item>
       <spacer name="bottomSpacer">
-       <property name="orientation"><enum>Qt::Horizontal</enum></property>
-       <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
+       <property name="orientation">
+        <enum>Qt::Orientation::Horizontal</enum>
+       </property>
+       <property name="sizeHint" stdset="0">
+        <size>
+         <width>40</width>
+         <height>20</height>
+        </size>
+       </property>
       </spacer>
      </item>
-
     </layout>
    </item>
-
   </layout>
  </widget>
  <resources/>
