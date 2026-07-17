@@ -17,8 +17,14 @@ class YoloTrainer(QThread):
     def run(self):
         try:
             from ultralytics import YOLO
+            import os
 
-            model = YOLO(f"{self._model_name}.pt")
+            models_dir = os.path.join(
+                os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+                "models",
+            )
+            os.makedirs(models_dir, exist_ok=True)
+            model = YOLO(os.path.join(models_dir, f"{self._model_name}.pt"))
             total = self._epochs
 
             def _on_epoch_end(trainer):
@@ -45,7 +51,6 @@ class YoloTrainer(QThread):
                 verbose=False,
             )
 
-            import os
             best = os.path.join(self._output_dir, "run", "weights", "best.pt")
             if os.path.exists(best):
                 self.training_finished.emit(best)

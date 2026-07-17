@@ -294,5 +294,5 @@ YoloStudioView (two tabs)
 
 ### Known issues
 - [ ] `ImageComparisonResultView._save_result()` hardcodes `~/Pictures/mis_monedas` as the save directory — should use `~/Pictures` or be configurable.
-- [ ] `src/presenters/comparison_presenter.py` is an empty (0-byte) file — dead code, should be deleted.
-- [ ] `yolov8n.pt` (base YOLOv8 weights, ~6.5MB) sits untracked in the project root — should move to a models/ folder or be added to `.gitignore` instead of living at the repo root.
+- [x] `src/presenters/comparison_presenter.py` was an empty (0-byte) dead file — deleted.
+- [x] `yolov8n.pt` (base YOLOv8 weights, ~6.5MB) moved from the repo root to `models/yolov8n.pt`; `YoloTrainer` now resolves the weights path from that folder instead of the process cwd.
