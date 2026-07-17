@@ -11,10 +11,12 @@ from ..utils.image_utils import TypePlatform
 
 
 class DeviceCameraView(QWidget):
-    connect_requested = pyqtSignal(int)
-    snapshot_requested = pyqtSignal()
-    recording_requested = pyqtSignal(bool)
-    view_closed = pyqtSignal()
+    connect_requested     = pyqtSignal(int)
+    snapshot_requested    = pyqtSignal()
+    recording_requested   = pyqtSignal(bool)
+    load_model_requested  = pyqtSignal()
+    detection_toggled     = pyqtSignal(bool)
+    view_closed           = pyqtSignal()
 
     def __init__(self):
         super().__init__()
@@ -29,6 +31,8 @@ class DeviceCameraView(QWidget):
         self.btnConnect.toggled.connect(self._on_connect_toggled)
         self.btnSnapshot.clicked.connect(self.snapshot_requested.emit)
         self.btnRecord.toggled.connect(self.recording_requested.emit)
+        self.btnLoadModelCamera.clicked.connect(self.load_model_requested.emit)
+        self.btnToggleDetection.toggled.connect(self.detection_toggled.emit)
         
     def get_info_from_ui(self)-> dict:
         if self.rdb_by_quantity.isChecked():
@@ -94,6 +98,26 @@ class DeviceCameraView(QWidget):
                 return f.read().strip()
         except OSError:
             return f"Camera {index}"
+
+    def set_detection_model_loaded(self, model_name: str):
+        self.lblDetectionModel.setText(model_name)
+        self.lblDetectionModel.setStyleSheet("color: green; font-size: 11px;")
+        self.btnToggleDetection.setEnabled(True)
+
+    def set_detection_model_failed(self, message: str):
+        self.lblDetectionModel.setText(f"Error: {message}")
+        self.lblDetectionModel.setStyleSheet("color: red; font-size: 11px;")
+        self.btnToggleDetection.setEnabled(False)
+
+    def set_detection_active(self, active: bool):
+        self.btnToggleDetection.setText(
+            "Disable Detection" if active else "Enable Detection"
+        )
+
+    def set_detect_count(self, count: int):
+        self.lblDetectCount.setText(
+            f"{count} detection(s)" if count > 0 else ""
+        )
 
     def set_connected(self, connected: bool):
         self._updating_ui = True

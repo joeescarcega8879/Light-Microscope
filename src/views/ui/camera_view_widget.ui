@@ -115,8 +115,47 @@
      </property>
     </widget>
    </item>
-   <item>
-    <layout class="QHBoxLayout" name="bottomBarLayout">
+    <!-- detection bar -->
+    <item>
+     <layout class="QHBoxLayout" name="detectBarLayout">
+      <property name="spacing"><number>8</number></property>
+      <item>
+       <widget class="QPushButton" name="btnLoadModelCamera">
+        <property name="text"><string>Load Model…</string></property>
+        <property name="toolTip"><string>Load a trained best.pt for live detection</string></property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLabel" name="lblDetectionModel">
+        <property name="text"><string>No model</string></property>
+        <property name="styleSheet"><string>color: gray; font-size: 11px;</string></property>
+       </widget>
+      </item>
+      <item>
+       <spacer name="detectSpacer">
+        <property name="orientation"><enum>Qt::Orientation::Horizontal</enum></property>
+        <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
+       </spacer>
+      </item>
+      <item>
+       <widget class="QLabel" name="lblDetectCount">
+        <property name="text"><string/></property>
+        <property name="styleSheet"><string>font-size: 11px;</string></property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="btnToggleDetection">
+        <property name="text"><string>Enable Detection</string></property>
+        <property name="checkable"><bool>true</bool></property>
+        <property name="enabled"><bool>false</bool></property>
+        <property name="toolTip"><string>Toggle live YOLOv8 detection overlay</string></property>
+       </widget>
+      </item>
+     </layout>
+    </item>
+
+    <item>
+     <layout class="QHBoxLayout" name="bottomBarLayout">
      <property name="spacing">
       <number>8</number>
      </property>

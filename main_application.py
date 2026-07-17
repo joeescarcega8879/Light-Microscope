@@ -37,7 +37,7 @@ class MainApplication:
     def _initialize_main_window(self):
         self.main_window = MainView()
         self.main_presenter = MainPresenter(self.main_window, self)
-        self.main_window.show()
+        self.main_window.showMaximized()
         self.login_view.close()
 
     def _show_dashboard(self):

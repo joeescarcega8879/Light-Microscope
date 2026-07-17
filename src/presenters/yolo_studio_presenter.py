@@ -5,6 +5,9 @@ from PyQt6.QtGui import QPixmap
 from PyQt6.QtWidgets import QFileDialog, QMessageBox
 
 from ..models.yolo_trainer import YoloTrainer
+from ..models.cloud_yolo_trainer import CloudYoloTrainer
+from ..models.colab_exporter import ColabExporter
+from ..models.yolo_inferencer import YoloInferencer
 from ..utils.yolo_utils import YoloUtils
 
 
@@ -15,7 +18,9 @@ class YoloStudioPresenter(QObject):
         self._image_paths: list[str] = []
         self._current_index: int = -1
         self._folder_path: str = ""
-        self._trainer: YoloTrainer | None = None
+        self._trainer: YoloTrainer | CloudYoloTrainer | None = None
+        self._colab_export_dir: str = ""
+        self._inferencer: YoloInferencer = YoloInferencer()
         self._connect_signals()
 
     def _connect_signals(self):
@@ -34,10 +39,15 @@ class YoloStudioPresenter(QObject):
         v.btnApplyToAll.clicked.connect(self._apply_to_all)
         v.canvas.annotation_added.connect(lambda *_: self._on_annotation_changed())
 
+        # detect
+        v.btnLoadModel.clicked.connect(self._load_model)
+        v.btnDetect.clicked.connect(self._run_detection)
+
         # training tab
         v.btnBrowseDataset.clicked.connect(self._browse_dataset)
         v.btnBrowseOutput.clicked.connect(self._browse_output)
         v.btnStartTraining.clicked.connect(self._start_training)
+        v.btnExportColab.clicked.connect(self._export_for_colab)
         v.btnOpenModelFolder.clicked.connect(self._open_model_folder)
 
     # ── annotation ────────────────────────────────────────────
@@ -201,17 +211,70 @@ class YoloStudioPresenter(QObject):
         if folder:
             self.view.lineOutputDir.setText(folder)
 
-    def _start_training(self):
-        dataset_dir = self.view.dataset_path()
-        output_dir = self.view.output_dir()
+    # ── inference ─────────────────────────────────────────────
 
-        if not dataset_dir or not os.path.isdir(dataset_dir):
-            self.view.lblTrainingStatus.setText("Error: select a valid dataset folder.")
+    def _load_model(self):
+        path, _ = QFileDialog.getOpenFileName(
+            self.view,
+            "Load trained model",
+            str(Path.home() / "Downloads"),
+            "PyTorch model (*.pt);;All files (*)",
+        )
+        if not path:
             return
-        if not output_dir:
-            output_dir = os.path.join(dataset_dir, "models")
-            self.view.lineOutputDir.setText(output_dir)
-        os.makedirs(output_dir, exist_ok=True)
+        try:
+            self._inferencer.load_model(path)
+            self.view.set_model_loaded(path)
+        except RuntimeError as exc:
+            self.view.set_model_load_failed(str(exc))
+
+    def _run_detection(self):
+        if self._current_index < 0 or not self._image_paths:
+            self.view.set_detect_failed("Load an image folder first.")
+            return
+        if not self._inferencer.is_loaded():
+            self.view.set_detect_failed("Load a model first.")
+            return
+
+        image_path = self._image_paths[self._current_index]
+        try:
+            detections = self._inferencer.predict(
+                image_path,
+                confidence=self.view.confidence(),
+            )
+        except RuntimeError as exc:
+            self.view.set_detect_failed(str(exc))
+            return
+
+        # Convert detections to YOLO annotation format and push to canvas
+        # (class_id, cx, cy, w, h) — same tuple the canvas already uses
+        annotations = [
+            (cls_id, cx, cy, w, h)
+            for cls_id, _name, _conf, cx, cy, w, h in detections
+        ]
+        self.view.canvas.set_annotations(annotations)
+        self.view.canvas.set_class_names(
+            [name for _id, name, *_ in detections]
+            if detections else self.view.class_names()
+        )
+        self.view.refresh_annotations_list()
+        self.view.set_detect_result(len(detections))
+
+    # ── training dispatch ──────────────────────────────────────
+
+    def _start_training(self):
+        backend = self.view.training_backend()
+        if backend == "modal":
+            self._start_training_modal()
+        else:
+            self._start_training_local()
+
+    # ── backend: local (CPU) ───────────────────────────────────
+
+    def _start_training_local(self):
+        dataset_dir, output_dir = self._resolve_paths()
+        if dataset_dir is None:
+            return
 
         class_names = YoloUtils.load_class_names(dataset_dir)
         if not class_names:
@@ -228,12 +291,7 @@ class YoloStudioPresenter(QObject):
             self.view.lblTrainingStatus.setText(f"Error: {exc}")
             return
 
-        self.view.logTraining.clear()
-        self.view.progressTraining.setValue(0)
-        self.view.progressTraining.setMaximum(self.view.epochs())
-        self.view.btnStartTraining.setEnabled(False)
-        self.view.btnOpenModelFolder.setVisible(False)
-        self.view.lblModelPath.setText("")
+        self._reset_training_ui()
 
         self._trainer = YoloTrainer(
             data_yaml=yaml_path,
@@ -241,15 +299,122 @@ class YoloStudioPresenter(QObject):
             epochs=self.view.epochs(),
             output_dir=output_dir,
         )
-        self._trainer.epoch_ended.connect(self.view.set_training_progress)
-        self._trainer.log_message.connect(self.view.append_log)
-        self._trainer.training_finished.connect(self.view.set_training_finished)
-        self._trainer.training_failed.connect(self.view.set_training_failed)
+        self._connect_trainer(self._trainer)
         self._trainer.start()
 
+    # ── backend: Modal cloud GPU ───────────────────────────────
+
+    def _start_training_modal(self):
+        dataset_dir, output_dir = self._resolve_paths()
+        if dataset_dir is None:
+            return
+
+        if not YoloUtils.load_class_names(dataset_dir):
+            self.view.lblTrainingStatus.setText(
+                "Error: no classes.txt found. Add classes in the Annotate tab first."
+            )
+            return
+
+        self._reset_training_ui()
+
+        self._trainer = CloudYoloTrainer(
+            dataset_dir=dataset_dir,
+            model_name=self.view.selected_model_name(),
+            epochs=self.view.epochs(),
+            val_split=self.view.val_split(),
+            output_dir=output_dir,
+        )
+        self._connect_trainer(self._trainer)
+        self._trainer.start()
+
+    # ── backend: Google Colab export ───────────────────────────
+
+    def _export_for_colab(self):
+        dataset_dir = self.view.dataset_path()
+        if not dataset_dir or not os.path.isdir(dataset_dir):
+            self.view.lblTrainingStatus.setText("Error: select a valid dataset folder.")
+            return
+
+        if not YoloUtils.load_class_names(dataset_dir):
+            self.view.lblTrainingStatus.setText(
+                "Error: no classes.txt found. Add classes in the Annotate tab first."
+            )
+            return
+
+        # Ask user where to save the export
+        save_dir = QFileDialog.getExistingDirectory(
+            self.view, "Select folder to save Colab export"
+        )
+        if not save_dir:
+            return
+
+        self.view.btnExportColab.setEnabled(False)
+        self.view.lblTrainingStatus.setText("Preparing Colab export...")
+        self.view.logTraining.clear()
+        self.view.lblModelPath.setText("")
+        self.view.btnOpenModelFolder.setVisible(False)
+
+        ok, result = ColabExporter.export(
+            dataset_dir=dataset_dir,
+            output_dir=save_dir,
+            model_name=self.view.selected_model_name(),
+            epochs=self.view.epochs(),
+            val_split=self.view.val_split(),
+        )
+
+        if ok:
+            self.view.append_log("Export complete!")
+            self.view.append_log(f"Folder: {result}")
+            self.view.append_log("")
+            self.view.append_log("Next steps:")
+            self.view.append_log("  1. Upload 'dataset.zip' to Google Drive.")
+            self.view.append_log("  2. Upload 'colab_trainer.ipynb' to Google Drive.")
+            self.view.append_log("  3. Right-click the .ipynb → Open with Google Colab.")
+            self.view.append_log("  4. Run all cells (Ctrl+F9).")
+            self.view.append_log("  5. Download best.pt from Drive when training ends.")
+            self.view.set_colab_export_done(result)
+            self._colab_export_dir = result
+        else:
+            self.view.set_colab_export_failed(result)
+
+    # ── shared helpers ─────────────────────────────────────────
+
+    def _resolve_paths(self) -> tuple[str | None, str]:
+        """Validates and returns (dataset_dir, output_dir). Returns (None, '') on error."""
+        dataset_dir = self.view.dataset_path()
+        output_dir  = self.view.output_dir()
+
+        if not dataset_dir or not os.path.isdir(dataset_dir):
+            self.view.lblTrainingStatus.setText("Error: select a valid dataset folder.")
+            return None, ""
+
+        if not output_dir:
+            output_dir = os.path.join(dataset_dir, "models")
+            self.view.lineOutputDir.setText(output_dir)
+        os.makedirs(output_dir, exist_ok=True)
+        return dataset_dir, output_dir
+
+    def _reset_training_ui(self):
+        self.view.logTraining.clear()
+        self.view.progressTraining.setValue(0)
+        self.view.progressTraining.setMaximum(self.view.epochs())
+        self.view.btnStartTraining.setEnabled(False)
+        self.view.btnOpenModelFolder.setVisible(False)
+        self.view.lblModelPath.setText("")
+
+    def _connect_trainer(self, trainer):
+        trainer.epoch_ended.connect(self.view.set_training_progress)
+        trainer.log_message.connect(self.view.append_log)
+        trainer.training_finished.connect(self.view.set_training_finished)
+        trainer.training_failed.connect(self.view.set_training_failed)
+
     def _open_model_folder(self):
-        output_dir = self.view.output_dir()
-        run_dir = os.path.join(output_dir, "run")
-        folder = run_dir if os.path.isdir(run_dir) else output_dir
+        # Colab export path takes priority when set
+        if self._colab_export_dir and os.path.isdir(self._colab_export_dir):
+            folder = self._colab_export_dir
+        else:
+            output_dir = self.view.output_dir()
+            run_dir    = os.path.join(output_dir, "run")
+            folder     = run_dir if os.path.isdir(run_dir) else output_dir
         import subprocess
         subprocess.Popen(["xdg-open", folder])

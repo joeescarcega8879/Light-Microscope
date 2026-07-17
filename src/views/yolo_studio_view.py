@@ -41,7 +41,7 @@ class LabelingCanvas(QWidget):
         self._drawing = False
         self._start = QPoint()
         self._drag_rect = QRect()
-        self.setMinimumSize(400, 400)
+        self.setMinimumSize(300, 300)
         self.setCursor(Qt.CursorShape.CrossCursor)
         self.setMouseTracking(True)
 
@@ -214,6 +214,17 @@ class YoloStudioView(QWidget):
             lambda v: self.lblValSplit.setText(f"{v} %")
         )
 
+        # Backend selector — update hint label and button visibility on change
+        self.rdoLocal.toggled.connect(self._on_backend_changed)
+        self.rdoModal.toggled.connect(self._on_backend_changed)
+        self.rdoColab.toggled.connect(self._on_backend_changed)
+        self._on_backend_changed()  # set initial state
+
+        # Detect — confidence slider live label
+        self.sliderConfidence.valueChanged.connect(
+            lambda v: self.lblConfidence.setText(f"{v} %")
+        )
+
     # ── annotation helpers ────────────────────────────────────
 
     def current_class_id(self) -> int:
@@ -234,6 +245,64 @@ class YoloStudioView(QWidget):
             self.lstAnnotations.addItem(
                 f"{label}  ({cx:.2f}, {cy:.2f})  {w:.2f}×{h:.2f}"
             )
+
+    # ── detect helpers ────────────────────────────────────────
+
+    def confidence(self) -> float:
+        return self.sliderConfidence.value() / 100.0
+
+    def set_model_loaded(self, model_path: str):
+        import os
+        self.lblModelLoaded.setText(os.path.basename(model_path))
+        self.lblModelLoaded.setStyleSheet("color: green; font-size: 11px;")
+        self.btnDetect.setEnabled(True)
+        self.lblDetectStatus.setText("")
+
+    def set_model_load_failed(self, message: str):
+        self.lblModelLoaded.setText("Load failed")
+        self.lblModelLoaded.setStyleSheet("color: red; font-size: 11px;")
+        self.btnDetect.setEnabled(False)
+        self.lblDetectStatus.setText(message)
+
+    def set_detect_result(self, count: int):
+        if count == 0:
+            self.lblDetectStatus.setText("No detections found.")
+        else:
+            self.lblDetectStatus.setText(f"{count} detection(s) found.")
+
+    def set_detect_failed(self, message: str):
+        self.lblDetectStatus.setText(f"Error: {message}")
+
+    # ── backend helpers ───────────────────────────────────────
+
+    def training_backend(self) -> str:
+        """Returns 'local' | 'modal' | 'colab'."""
+        if self.rdoModal.isChecked():
+            return "modal"
+        if self.rdoColab.isChecked():
+            return "colab"
+        return "local"
+
+    def _on_backend_changed(self):
+        backend = self.training_backend()
+
+        hints = {
+            "local": "Trains on this machine using CPU. No internet required.",
+            "modal": (
+                "Trains on Modal cloud GPU (A10G, ~$1.10/hr).\n"
+                "One-time setup:  pip install modal  then  modal setup"
+            ),
+            "colab": (
+                "Exports dataset.zip + a pre-configured Colab notebook.\n"
+                "Open the notebook in Google Colab, run all cells, download best.pt."
+            ),
+        }
+        self.lblBackendHint.setText(hints[backend])
+
+        # Show/hide the correct action buttons
+        is_colab = backend == "colab"
+        self.btnStartTraining.setVisible(not is_colab)
+        self.btnExportColab.setVisible(is_colab)
 
     # ── training helpers ──────────────────────────────────────
 
@@ -271,6 +340,17 @@ class YoloStudioView(QWidget):
     def set_training_failed(self, message: str):
         self.btnStartTraining.setEnabled(True)
         self.lblTrainingStatus.setText(f"Error: {message}")
+
+    def set_colab_export_done(self, export_dir: str):
+        """Called when ColabExporter finishes successfully."""
+        self.btnExportColab.setEnabled(True)
+        self.lblTrainingStatus.setText("Export ready. Open colab_trainer.ipynb in Google Colab.")
+        self.lblModelPath.setText(f"Saved to: {export_dir}")
+        self.btnOpenModelFolder.setVisible(True)
+
+    def set_colab_export_failed(self, message: str):
+        self.btnExportColab.setEnabled(True)
+        self.lblTrainingStatus.setText(f"Export error: {message}")
 
     # ──────────────────────────────────────────────────────────
 

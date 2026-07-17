@@ -65,14 +65,18 @@ src/
 ├── models/
 │   ├── device_camera_startup.py # QThread: opens cv2.VideoCapture, emits change_pixmap_signal(QPixmap) and raw_frame_signal
 │   ├── yolo_trainer.py          # QThread: runs YOLOv8 training via ultralytics; emits epoch_ended, training_finished, training_failed, log_message
+│   ├── cloud_yolo_trainer.py    # QThread: trains YOLOv8 on Modal cloud GPU (A10G); same signals as YoloTrainer; zip→upload→run→download
+│   ├── modal_trainer.py         # Modal app definition: train_yolo() remote function + local_entrypoint(); GPU A10G, Volumes: yolo-microscope-data / yolo-microscope-weights
+│   ├── colab_exporter.py        # ColabExporter.export(): zips dataset + generates pre-configured colab_trainer.ipynb; no QThread (runs on main thread)
+│   ├── yolo_inferencer.py       # YoloInferencer: load_model(path), predict(image_path), predict_frame(np_frame); wraps ultralytics YOLO for inference (no QThread)
 │   └── image_model.py           # Stub: will load images/video, run diff, heatmap, measurement
 │
 ├── presenters/
 │   ├── login_presenter.py              # Wires LoginView.login_requested → on_login_success callback
 │   ├── main_presenter.py               # Connects MainView signals → MainApplication methods
-│   ├── device_camera_presenter.py      # Full camera: connect, snapshot, recording, FPS; stops capture on view_closed
+│   ├── device_camera_presenter.py      # Full camera: connect, snapshot, recording, FPS, live YOLO detection overlay (throttled every N frames); stops capture on view_closed
 │   ├── image_comparison_presenter.py   # Loads images, runs compute_diff + draw_contours, calls main_app.open_comparison_result_view()
-│   ├── yolo_studio_presenter.py        # Annotation: load folder, navigate images, draw/save YOLO labels; Training: prepare dataset, launch YoloTrainer
+│       ├── yolo_studio_presenter.py        # Annotation: load folder, navigate images, draw/save YOLO labels, run detection on current image (YoloInferencer) to pre-fill boxes; Training: dispatches to YoloTrainer (local), CloudYoloTrainer (Modal), or ColabExporter (Colab export)
 │   └── settings_presenter.py           # Wires SettingsView → ThemeManager.apply_theme()
 │
 ├── utils/
@@ -83,7 +87,7 @@ src/
 └── views/
     ├── main_view.py                    # MainView(QMainWindow): loads main_window.ui (dashboard grid), emits signals for all buttons
     ├── login_view.py                   # LoginView: loads login.ui, emits login_requested on btnLogin
-    ├── device_camera_view.py           # DeviceCameraView: camera UI, emits view_closed on close
+    ├── device_camera_view.py           # DeviceCameraView: camera UI, live YOLO detection toggle + model loader, emits view_closed on close
     ├── settings_view.py                # SettingsView(QDialog): modal theme selector with Apply/Cancel
     ├── image_comparison_view.py        # ImageComparisonView: loads A/B images, slider, Compare button; emits view_closed
     ├── image_comparison_result_view.py # ImageComparisonResultView: shows diff (grayscale), heatmap (JET), contours (green on img A), stats, Save button
@@ -91,11 +95,11 @@ src/
     └── ui/
         ├── main_window.ui                      # QMainWindow: dashboard grid (Images, Video, Measure, AI Studio, Settings)
         ├── login.ui                            # QWidget: username, password, show-pwd checkbox, error label
-        ├── camera_view_widget.ui               # QWidget: cmbCamera, btnConnect, lblFeed, btnSnapshot, btnRecord, lblTimer
+        ├── camera_view_widget.ui               # QWidget: cmbCamera, btnConnect, lblFeed, btnSnapshot, btnRecord, lblTimer, btnLoadModelCamera, btnToggleDetection, lblDetectionModel, lblDetectCount
         ├── settings_dialog.ui                  # QDialog: theme title, QGroupBox with QComboBox, preview, Apply/Cancel
         ├── image_comparison_widget.ui          # lblImageA/B, btnLoadA/B, btnCompare, sliderThreshold, lblThresholdValue
         ├── image_comparison_result_widget.ui   # lblDiff, lblHeatmap, lblContours, lblStats, btnSaveResult
-        ├── yolo_studio_widget.ui               # Two-tab QWidget: Annotate (canvasFrame, lstClasses, lstAnnotations) + Train (model, epochs, val split, progress, log)
+        ├── yolo_studio_widget.ui               # Two-tab QWidget: Annotate (canvasFrame, lstClasses, lstAnnotations, btnLoadModel, sliderConfidence, btnDetect) + Train (backend selector, model, epochs, val split, progress, log)
         ├── video_comparison_widget.ui          # Video loader, two frame pickers, diff/heatmap output
         └── length_measurement_widget.ui        # Canvas + scale calibration + measurements table
 ```
@@ -168,20 +172,47 @@ YoloStudioView (two tabs)
   │     Controls: btnLoadFolder, btnPrev, btnNext, btnSaveLabels
   │               lstClasses (add/remove), lineClassName, btnAddClass, btnRemoveClass
   │               lstAnnotations, btnDeleteAnnotation
+  │     Detect (pre-fill boxes with a trained model):
+  │               btnLoadModel → YoloStudioPresenter._load_model() → YoloInferencer.load_model(path)
+  │               sliderConfidence / lblConfidence — confidence threshold (0–100%)
+  │               btnDetect → YoloStudioPresenter._run_detection()
+  │                     ↓ YoloInferencer.predict(current image path, confidence)
+  │                     ↓ converts detections → (class_id, cx, cy, w, h) tuples
+  │                     ↓ canvas.set_annotations() + canvas.set_class_names() → boxes drawn on canvas
+  │                     ↓ view.refresh_annotations_list() + set_detect_result(count)
   │
-  └── Tab: Train
+   └── Tab: Train
+        groupBackend — rdoLocal | rdoModal | rdoColab  (training backend selector)
+        lblBackendHint — contextual hint per backend (auto-updates on selection)
         cmbModel     — YOLOv8 Nano | YOLOv8 Small
         sliderEpochs / sliderValSplit (with live labels)
         lineDatasetPath / lineOutputDir (auto-filled from Annotate tab)
-        btnStartTraining → YoloStudioPresenter._start_training()
-              ↓ YoloUtils.prepare_dataset() → yolo_dataset/data.yaml
-              ↓ YoloTrainer(QThread).start()
-                    ↓ ultralytics YOLO.train() with on_train_epoch_end callback
-                    ↓ epoch_ended → view.set_training_progress()
-                    ↓ log_message → view.append_log()
-                    ↓ training_finished(best.pt path) → view.set_training_finished()
-                    ↓ training_failed(msg)            → view.set_training_failed()
-        btnOpenModelFolder → xdg-open output_dir/run
+        btnStartTraining → YoloStudioPresenter._start_training()  [Local + Modal]
+              ↓ backend == "local"
+              │     ↓ YoloUtils.prepare_dataset() → yolo_dataset/data.yaml
+              │     ↓ YoloTrainer(QThread).start()
+              │           ↓ ultralytics YOLO.train() with on_train_epoch_end callback
+              │           ↓ epoch_ended → view.set_training_progress()
+              │           ↓ log_message → view.append_log()
+              │           ↓ training_finished(best.pt path) → view.set_training_finished()
+              │           ↓ training_failed(msg)            → view.set_training_failed()
+              └─ backend == "modal"
+                    ↓ CloudYoloTrainer(QThread).start()
+                          ↓ check modal CLI + auth
+                          ↓ zip dataset_dir → /tmp/yolo_microscope_upload.zip
+                          ↓ modal volume put yolo-microscope-data → /dataset.zip
+                          ↓ modal run modal_trainer.py (subprocess, stdout parsed line by line)
+                          │     → [EPOCH] lines → epoch_ended signal (progress bar updates live)
+                          │     → all lines    → log_message signal
+                          ↓ modal volume get yolo-microscope-weights → local output_dir/best.pt
+                          ↓ training_finished(local best.pt) → view.set_training_finished()
+        btnExportColab → YoloStudioPresenter._export_for_colab()  [Colab backend only]
+              ↓ ColabExporter.export()
+                    ↓ zips images + labels + classes.txt → dataset.zip
+                    ↓ generates colab_trainer.ipynb (model/epochs/val_split pre-filled)
+                    ↓ saves both to colab_export/ inside user-chosen folder
+                    ↓ log area shows step-by-step instructions for the user
+        btnOpenModelFolder → xdg-open output_dir/run  (or colab_export/ after export)
 ```
 
 ## UI / Styling
@@ -197,6 +228,7 @@ YoloStudioView (two tabs)
   - Settings: `#cmbTheme`, `#btnApply`, `#btnCancel`
   - Image comparison: `#btnLoadA`, `#btnLoadB`, `#btnCompare`, `#sliderThreshold`, `#lblThresholdValue`
   - Comparison results: `#lblDiff`, `#lblHeatmap`, `#lblContours`, `#lblStats`, `#btnSaveResult`
+  - AI Studio Train tab: `#groupBackend`, `#rdoLocal`, `#rdoModal`, `#rdoColab`, `#lblBackendHint`, `#btnStartTraining`, `#btnExportColab`
 
 ## Key Constraints
 
@@ -216,9 +248,9 @@ YoloStudioView (two tabs)
 | `LoginPresenter` | Done — no credential validation yet |
 | `main_window.ui` + `MainView` | Done — 2×2 dashboard grid, no MDI |
 | `MainPresenter` | Done — connects video, image comparison, and settings signals |
-| `camera_view_widget.ui` + `DeviceCameraView` | Done — camera enumeration, connect/disconnect, snapshot, recording, `view_closed` |
+| `camera_view_widget.ui` + `DeviceCameraView` | Done — camera enumeration, connect/disconnect, snapshot, recording, load detection model, toggle live detection, `view_closed` |
 | `DeviceCameraStartup` (QThread) | Done — capture loop inside `run()`, emits pixmap and raw frames |
-| `DeviceCameraPresenter` | Done — full camera lifecycle, FPS display, snapshot to `~/Pictures`, recording with timer, stops capture on `view_closed` |
+| `DeviceCameraPresenter` | Done — full camera lifecycle, FPS display, snapshot to `~/Pictures`, recording with timer, live YOLO detection overlay (throttled), stops capture on `view_closed` |
 | `ThemeManager` | Done — scans `*.qss` from `assets/css/`, applies globally |
 | `settings_dialog.ui` + `SettingsView` | Done — QDialog modal with theme combo and Apply/Cancel |
 | `SettingsPresenter` | Done |
@@ -227,9 +259,13 @@ YoloStudioView (two tabs)
 | `image_comparison_result_widget.ui` + `ImageComparisonResultView` | Done — diff, heatmap, contours panels, stats, Save button |
 | `ImageComparisonPresenter` | Done — null guard, compute_diff, draw_contours, stats, opens result view |
 | `ImageUtils` | Done — `compute_diff()`, `draw_contours()`, `qpixmap_to_numpy()`, `open_image_file_dialog()` |
-| `yolo_studio_widget.ui` + `YoloStudioView` | Done — two-tab UI, `LabelingCanvas` custom widget, `view_closed` |
-| `YoloStudioPresenter` | Done — folder loading, image navigation, label save/load, class management, training launch |
+| `yolo_studio_widget.ui` + `YoloStudioView` | Done — two-tab UI, `LabelingCanvas` custom widget, backend selector (Local/Modal/Colab), `view_closed` |
+| `YoloStudioPresenter` | Done — folder loading, image navigation, label save/load, class management, run detection to pre-fill boxes, training dispatch to all three backends |
 | `YoloTrainer` (QThread) | Done — ultralytics YOLOv8 training, epoch callbacks, emits progress/finished/failed signals |
+| `CloudYoloTrainer` (QThread) | Done — Modal cloud GPU training; zip→upload→run→download; emits same signals as `YoloTrainer` |
+| `modal_trainer.py` | Done — Modal app (A10G GPU); reads dataset from Volume, trains, emits `[EPOCH]` lines, saves weights to Volume |
+| `ColabExporter` | Done — generates `dataset.zip` + pre-configured `colab_trainer.ipynb`; runs synchronously on main thread |
+| `YoloInferencer` | Done — `load_model()`, `predict()` (image file), `predict_frame()` (numpy BGR); used by camera live detection and AI Studio "Detect" button |
 | `YoloUtils` | Done — `load_labels()`, `save_labels()`, `prepare_dataset()`, `load_class_names()`, `save_class_names()` |
 | `video_comparison_widget.ui` | UI file exists, no view/presenter yet |
 | `length_measurement_widget.ui` | UI file exists, no view/presenter yet |
@@ -259,3 +295,4 @@ YoloStudioView (two tabs)
 ### Known issues
 - [ ] `ImageComparisonResultView._save_result()` hardcodes `~/Pictures/mis_monedas` as the save directory — should use `~/Pictures` or be configurable.
 - [ ] `src/presenters/comparison_presenter.py` is an empty (0-byte) file — dead code, should be deleted.
+- [ ] `yolov8n.pt` (base YOLOv8 weights, ~6.5MB) sits untracked in the project root — should move to a models/ folder or be added to `.gitignore` instead of living at the repo root.
