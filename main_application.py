@@ -1,6 +1,7 @@
 import os
 import sys
-from PyQt6.QtWidgets import QApplication
+from PyQt6.QtCore import QTimer
+from PyQt6.QtWidgets import QApplication, QWidget
 
 from src.views.main_view import MainView
 from src.views.login_view import LoginView
@@ -21,6 +22,14 @@ from src.utils.theme_manager import ThemeManager
 
 
 class MainApplication:
+    @staticmethod
+    def _open_maximized(widget: QWidget):
+        # GNOME/Mutter (and other X11 WMs) ignore a maximize request sent in the
+        # same tick as widget construction/show() — the window isn't mapped yet.
+        # A short real delay lets the WM finish that negotiation first.
+        widget.show()
+        QTimer.singleShot(100, widget.showMaximized)
+
     def __init__(self):
         css_dir = os.path.join(os.path.dirname(__file__), "src", "assets", "css")
         self._theme_manager = ThemeManager(css_dir)
@@ -37,11 +46,11 @@ class MainApplication:
     def _initialize_main_window(self):
         self.main_window = MainView()
         self.main_presenter = MainPresenter(self.main_window, self)
-        self.main_window.showMaximized()
+        self._open_maximized(self.main_window)
         self.login_view.close()
 
     def _show_dashboard(self):
-        self.main_window.showMaximized()
+        self._open_maximized(self.main_window)
 
     def open_camera_view(self):
         self.device_camera_view = DeviceCameraView()
@@ -50,7 +59,7 @@ class MainApplication:
 
         self.main_window.hide()
         self.device_camera_view.setWindowTitle("Video Capture")
-        self.device_camera_view.showMaximized()
+        self._open_maximized(self.device_camera_view)
 
     def open_image_comparison_view(self):
         self.image_comparison_view = ImageComparisonView()
@@ -59,7 +68,7 @@ class MainApplication:
 
         self.main_window.hide()
         self.image_comparison_view.setWindowTitle("Image Comparison")
-        self.image_comparison_view.showMaximized()
+        self._open_maximized(self.image_comparison_view)
 
     def open_comparison_result_view(self, diff, heatmap, contour_img, stats_text: str):
         self.comparison_result_view = ImageComparisonResultView()
@@ -68,7 +77,7 @@ class MainApplication:
         self.comparison_result_view.display_contours(contour_img)
         self.comparison_result_view.set_stats(stats_text)
         self.comparison_result_view.setWindowTitle("Comparison Results")
-        self.comparison_result_view.showMaximized()
+        self._open_maximized(self.comparison_result_view)
 
     def open_ai_studio_view(self):
         self.ai_studio_view = YoloStudioView()
@@ -76,7 +85,7 @@ class MainApplication:
         self.ai_studio_view.view_closed.connect(self._show_dashboard)
         self.main_window.hide()
         self.ai_studio_view.setWindowTitle("AI Studio — Annotate & Train")
-        self.ai_studio_view.showMaximized()
+        self._open_maximized(self.ai_studio_view)
 
     def open_settings_dialog(self):
         theme_names = self._theme_manager.theme_names()
