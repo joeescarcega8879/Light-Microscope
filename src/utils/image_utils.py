@@ -37,6 +37,34 @@ class ImageUtils:
         return result
 
     @staticmethod
+    def detect_contours(img: np.ndarray, threshold: int = 127, use_canny: bool = False,
+                        canny_low: int = 50, canny_high: int = 150, min_area: int = 0,
+                        color: tuple = (0, 255, 0), thickness: int = 2):
+        """
+        Detect contours in a single image via binary thresholding or Canny edge detection.
+
+        Returns a tuple (contour_img, contours, mask):
+          - contour_img: copy of img with contours (area >= min_area) drawn
+          - contours: list of contours with area >= min_area
+          - mask: the binary/edge image contours were found on
+        """
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+
+        if use_canny:
+            mask = cv2.Canny(blurred, canny_low, canny_high)
+        else:
+            _, mask = cv2.threshold(blurred, threshold, 255, cv2.THRESH_BINARY)
+
+        all_contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        contours = [c for c in all_contours if cv2.contourArea(c) >= min_area]
+
+        contour_img = img.copy()
+        cv2.drawContours(contour_img, contours, -1, color, thickness)
+
+        return contour_img, contours, mask
+
+    @staticmethod
     def qpixmap_to_numpy(pixmap: QPixmap) -> np.ndarray:
         image = pixmap.toImage().convertToFormat(QImage.Format.Format_BGR888)
         width, height = image.width(), image.height()

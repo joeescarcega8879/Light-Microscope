@@ -47,7 +47,7 @@ class ImageComparisonResultView(QWidget):
         self.lblStats.setText(text)
 
     def _save_result(self):
-        if self._heatmap_pixmap is None:
+        if self._contours_pixmap is None:
             return
         pictures_dir = os.path.expanduser("~/Pictures/mis_monedas")
         os.makedirs(pictures_dir, exist_ok=True)
@@ -58,7 +58,7 @@ class ImageComparisonResultView(QWidget):
             self, "Save Result", default_path, "PNG Image (*.png);;JPEG Image (*.jpg)"
         )
         if path:
-            self._heatmap_pixmap.save(path)
+            self._contours_pixmap.save(path)
 
     def closeEvent(self, event):
         self.view_closed.emit()

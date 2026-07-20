@@ -1,5 +1,5 @@
-import cv2
 import os
+import cv2
 import glob
 import platform
 from PyQt6 import uic

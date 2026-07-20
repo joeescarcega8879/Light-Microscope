@@ -10,6 +10,8 @@ from src.views.settings_view import SettingsView
 from src.views.image_comparison_view import ImageComparisonView
 from src.views.image_comparison_result_view import ImageComparisonResultView
 from src.views.yolo_studio_view import YoloStudioView
+from src.views.length_measurement_view import LengthMeasurementView
+from src.views.contour_detection_view import ContourDetectionView
 
 from src.presenters.login_presenter import LoginPresenter
 from src.presenters.main_presenter import MainPresenter
@@ -17,6 +19,8 @@ from src.presenters.device_camera_presenter import DeviceCameraPresenter
 from src.presenters.image_comparison_presenter import ImageComparisonPresenter
 from src.presenters.settings_presenter import SettingsPresenter
 from src.presenters.yolo_studio_presenter import YoloStudioPresenter
+from src.presenters.length_measurement_presenter import LengthMeasurementPresenter
+from src.presenters.contour_detection_presenter import ContourDetectionPresenter
 
 from src.utils.theme_manager import ThemeManager
 
@@ -46,11 +50,13 @@ class MainApplication:
     def _initialize_main_window(self):
         self.main_window = MainView()
         self.main_presenter = MainPresenter(self.main_window, self)
-        self._open_maximized(self.main_window)
+        # self._open_maximized(self.main_window)
+        self.main_window.show()
         self.login_view.close()
 
     def _show_dashboard(self):
-        self._open_maximized(self.main_window)
+        # self._open_maximized(self.main_window)
+        self.main_window.show()
 
     def open_camera_view(self):
         self.device_camera_view = DeviceCameraView()
@@ -59,7 +65,8 @@ class MainApplication:
 
         self.main_window.hide()
         self.device_camera_view.setWindowTitle("Video Capture")
-        self._open_maximized(self.device_camera_view)
+        self.device_camera_view.show()
+        # self._open_maximized(self.device_camera_view)
 
     def open_image_comparison_view(self):
         self.image_comparison_view = ImageComparisonView()
@@ -68,7 +75,8 @@ class MainApplication:
 
         self.main_window.hide()
         self.image_comparison_view.setWindowTitle("Image Comparison")
-        self._open_maximized(self.image_comparison_view)
+        # self._open_maximized(self.image_comparison_view)
+        self.image_comparison_view.show()
 
     def open_comparison_result_view(self, diff, heatmap, contour_img, stats_text: str):
         self.comparison_result_view = ImageComparisonResultView()
@@ -77,7 +85,8 @@ class MainApplication:
         self.comparison_result_view.display_contours(contour_img)
         self.comparison_result_view.set_stats(stats_text)
         self.comparison_result_view.setWindowTitle("Comparison Results")
-        self._open_maximized(self.comparison_result_view)
+        # self._open_maximized(self.comparison_result_view)
+        self.comparison_result_view.show()
 
     def open_ai_studio_view(self):
         self.ai_studio_view = YoloStudioView()
@@ -85,7 +94,28 @@ class MainApplication:
         self.ai_studio_view.view_closed.connect(self._show_dashboard)
         self.main_window.hide()
         self.ai_studio_view.setWindowTitle("AI Studio — Annotate & Train")
-        self._open_maximized(self.ai_studio_view)
+        # self._open_maximized(self.ai_studio_view)
+        self.ai_studio_view.show()
+
+    def open_length_measurement_view(self):
+        self.length_measurement_view = LengthMeasurementView()
+        self.length_measurement_presenter = LengthMeasurementPresenter(self.length_measurement_view)
+        self.length_measurement_view.view_closed.connect(self._show_dashboard)
+
+        self.main_window.hide()
+        self.length_measurement_view.setWindowTitle("Length Measurement")
+        # self._open_maximized(self.length_measurement_view)
+        self.length_measurement_view.show()
+
+    def open_contour_detection_view(self):
+        self.contour_detection_view = ContourDetectionView()
+        self.contour_detection_presenter = ContourDetectionPresenter(self.contour_detection_view)
+        self.contour_detection_view.view_closed.connect(self._show_dashboard)
+
+        self.main_window.hide()
+        self.contour_detection_view.setWindowTitle("Contour Detection")
+        # self._open_maximized(self.contour_detection_view)
+        self.contour_detection_view.show()
 
     def open_settings_dialog(self):
         theme_names = self._theme_manager.theme_names()

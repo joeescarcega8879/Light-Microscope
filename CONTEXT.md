@@ -77,7 +77,9 @@ src/
 │   ├── device_camera_presenter.py      # Full camera: connect, snapshot, recording, FPS, live YOLO detection overlay (throttled every N frames); stops capture on view_closed
 │   ├── image_comparison_presenter.py   # Loads images, runs compute_diff + draw_contours, calls main_app.open_comparison_result_view()
 │       ├── yolo_studio_presenter.py        # Annotation: load folder, navigate images, draw/save YOLO labels, run detection on current image (YoloInferencer) to pre-fill boxes; Training: dispatches to YoloTrainer (local), CloudYoloTrainer (Modal), or ColabExporter (Colab export)
-│   └── settings_presenter.py           # Wires SettingsView → ThemeManager.apply_theme()
+│   ├── settings_presenter.py           # Wires SettingsView → ThemeManager.apply_theme()
+│   ├── length_measurement_presenter.py # Handles measurement_completed from canvas, scale calibration (px→unit factor), table sync, CSV export
+│   └── contour_detection_presenter.py  # Loads a single image, runs ImageUtils.detect_contours() on param changes (threshold/canny/min-area), pushes result + stats to view
 │
 ├── utils/
 │   ├── image_utils.py           # ImageUtils: compute_diff(), draw_contours(), qpixmap_to_numpy(), open_image_file_dialog(); TypeCapture/TypePlatform enums
@@ -92,6 +94,9 @@ src/
     ├── image_comparison_view.py        # ImageComparisonView: loads A/B images, slider, Compare button; emits view_closed
     ├── image_comparison_result_view.py # ImageComparisonResultView: shows diff (grayscale), heatmap (JET), contours (green on img A), stats, Save button
     ├── yolo_studio_view.py             # YoloStudioView: two-tab UI (Annotate + Train); contains LabelingCanvas (custom QWidget)
+    ├── length_measurement_view.py      # LengthMeasurementView: loads length_measurement_widget.ui, promotes lblCanvas → MeasurementCanvas, wires zoom/scale/table/export; emits view_closed
+    ├── image_panel.py                  # MeasurementCanvas(QWidget): paints image + click-to-measure points/lines, zoom in/out/fit, emits measurement_completed(x1,y1,x2,y2) + mouse_moved(x,y)
+    ├── contour_detection_view.py       # ContourDetectionView: loads contour_detection_widget.ui, Load Image + threshold/canny/min-area controls, displays result + stats, Save Result; emits view_closed
     └── ui/
         ├── main_window.ui                      # QMainWindow: dashboard grid (Images, Video, Measure, AI Studio, Settings)
         ├── login.ui                            # QWidget: username, password, show-pwd checkbox, error label
@@ -101,7 +106,8 @@ src/
         ├── image_comparison_result_widget.ui   # lblDiff, lblHeatmap, lblContours, lblStats, btnSaveResult
         ├── yolo_studio_widget.ui               # Two-tab QWidget: Annotate (canvasFrame, lstClasses, lstAnnotations, btnLoadModel, sliderConfidence, btnDetect) + Train (backend selector, model, epochs, val split, progress, log)
         ├── video_comparison_widget.ui          # Video loader, two frame pickers, diff/heatmap output
-        └── length_measurement_widget.ui        # Canvas + scale calibration + measurements table
+        ├── length_measurement_widget.ui        # Canvas (lblCanvas placeholder, promoted to MeasurementCanvas in code) + scale calibration + measurements table
+        └── contour_detection_widget.ui         # lblImage, btnLoadImage, method radios (rdoThreshold/rdoCanny), threshold/canny/min-area sliders, lblStats, btnSaveResult
 ```
 
 ## Application Flow
@@ -115,8 +121,9 @@ QApplication
               ├── btnVideo    → hides dashboard → opens DeviceCameraView (standalone)     [DONE]
               ├── btnImages   → hides dashboard → opens ImageComparisonView (standalone)  [DONE]
               │                                         └── btnCompare → opens ImageComparisonResultView (standalone, on top)
-              ├── btnMeasure  → reserved for LengthMeasurementView                        [NOT WIRED]
+              ├── btnMeasure  → hides dashboard → opens LengthMeasurementView (standalone) [DONE]
               ├── btnAiStudio → hides dashboard → opens YoloStudioView (standalone)       [DONE]
+              ├── btnContours → hides dashboard → opens ContourDetectionView (standalone) [DONE]
               └── btnSettings → opens SettingsView as QDialog modal (no hide)             [DONE]
 ```
 
@@ -145,6 +152,7 @@ ImageComparisonView
 |---|---|---|
 | `compute_diff` | `(img_a, img_b, threshold=0)` | `(diff: uint8 2D, binary_mask: uint8 2D, heatmap: uint8 3D BGR)` |
 | `draw_contours` | `(base_img, binary_mask, color=(0,255,0), thickness=2)` | `np.ndarray BGR` — copy of base_img with contours drawn |
+| `detect_contours` | `(img, threshold=127, use_canny=False, canny_low=50, canny_high=150, min_area=0, color=(0,255,0), thickness=2)` | `(contour_img, contours, mask)` — blurs + thresholds/Cannys img, finds contours, filters by min_area, draws them |
 | `qpixmap_to_numpy` | `(pixmap: QPixmap)` | `np.ndarray BGR` |
 | `open_image_file_dialog` | `()` | `str` file path |
 
@@ -215,6 +223,40 @@ YoloStudioView (two tabs)
         btnOpenModelFolder → xdg-open output_dir/run  (or colab_export/ after export)
 ```
 
+## Length Measurement Flow
+
+```
+LengthMeasurementView
+  ├── btnLoadImage → ImageUtils.open_image_file_dialog() → canvas.set_image(path)
+  ├── MeasurementCanvas (custom QWidget, promoted from lblCanvas placeholder in .ui)
+  │     ├── paintEvent draws image scaled by zoom + measurement points/lines
+  │     ├── click 1 → pending point (orange) ; click 2 → measurement_completed(x1,y1,x2,y2)
+  │     └── mouseMoveEvent → mouse_moved(x,y) → lblCoords
+  ├── btnZoomIn / btnZoomOut / btnZoomFit → canvas.zoom_in()/zoom_out()/zoom_fit()
+  ├── btnSetScale → LengthMeasurementPresenter._on_set_scale()
+  │     └── scale_factor = real_length / known_pixels  → lblScaleInfo, recomputes table unit column
+  ├── measurement_completed → presenter computes px_length (hypot), appends table row
+  ├── btnDeleteMeasurement → removes selected table row + matching canvas measurement
+  ├── btnClearAll → clears table + canvas
+  └── btnExportCSV → writes #, Length(px), Length(unit) rows via QFileDialog.getSaveFileName
+```
+
+## Contour Detection Flow
+
+```
+ContourDetectionView
+  ├── btnLoadImage → load_image_requested → ContourDetectionPresenter._on_load_image()
+  │     └── cv2.imread(path) → self._image, then runs detection
+  ├── groupMethod: rdoThreshold | rdoCanny (mutually exclusive, same QGroupBox parent)
+  ├── sliderThreshold / sliderCannyLow / sliderCannyHigh / sliderMinArea
+  │     └── valueChanged → detection_params_changed → presenter re-runs detection live
+  ├── ContourDetectionPresenter._run_detection()
+  │     ↓ ImageUtils.detect_contours(image, threshold, use_canny, canny_low, canny_high, min_area)
+  │     ↓ view.display_result(contour_img) — image scaled into lblImage, keeps aspect ratio
+  │     ↓ view.set_stats(f"Contours: N   Total area: X px²")
+  └── btnSaveResult → saves the displayed result pixmap via QFileDialog (view-local, like ImageComparisonResultView)
+```
+
 ## UI / Styling
 
 - Global QSS applied via `ThemeManager` from `src/assets/css/*.qss` files.
@@ -228,6 +270,7 @@ YoloStudioView (two tabs)
   - Settings: `#cmbTheme`, `#btnApply`, `#btnCancel`
   - Image comparison: `#btnLoadA`, `#btnLoadB`, `#btnCompare`, `#sliderThreshold`, `#lblThresholdValue`
   - Comparison results: `#lblDiff`, `#lblHeatmap`, `#lblContours`, `#lblStats`, `#btnSaveResult`
+  - Contour detection: `#btnLoadImage`, `#lblImage`, `#rdoThreshold`, `#rdoCanny`, `#sliderThreshold`, `#sliderCannyLow`, `#sliderCannyHigh`, `#sliderMinArea`, `#lblStats`, `#btnSaveResult`
   - AI Studio Train tab: `#groupBackend`, `#rdoLocal`, `#rdoModal`, `#rdoColab`, `#lblBackendHint`, `#btnStartTraining`, `#btnExportColab`
 
 ## Key Constraints
@@ -246,8 +289,8 @@ YoloStudioView (two tabs)
 | `main_application.py` | Done — login flow, dashboard, opens all secondary views, `open_comparison_result_view()` |
 | `login.ui` + `LoginView` | Done |
 | `LoginPresenter` | Done — no credential validation yet |
-| `main_window.ui` + `MainView` | Done — 2×2 dashboard grid, no MDI |
-| `MainPresenter` | Done — connects video, image comparison, and settings signals |
+| `main_window.ui` + `MainView` | Done — dashboard grid (2×3, one cell open), no MDI |
+| `MainPresenter` | Done — connects video, image comparison, measurement, AI Studio, contour detection, and settings signals |
 | `camera_view_widget.ui` + `DeviceCameraView` | Done — camera enumeration, connect/disconnect, snapshot, recording, load detection model, toggle live detection, `view_closed` |
 | `DeviceCameraStartup` (QThread) | Done — capture loop inside `run()`, emits pixmap and raw frames |
 | `DeviceCameraPresenter` | Done — full camera lifecycle, FPS display, snapshot to `~/Pictures`, recording with timer, live YOLO detection overlay (throttled), stops capture on `view_closed` |
@@ -268,7 +311,11 @@ YoloStudioView (two tabs)
 | `YoloInferencer` | Done — `load_model()`, `predict()` (image file), `predict_frame()` (numpy BGR); used by camera live detection and AI Studio "Detect" button |
 | `YoloUtils` | Done — `load_labels()`, `save_labels()`, `prepare_dataset()`, `load_class_names()`, `save_class_names()` |
 | `video_comparison_widget.ui` | UI file exists, no view/presenter yet |
-| `length_measurement_widget.ui` | UI file exists, no view/presenter yet |
+| `length_measurement_widget.ui` + `LengthMeasurementView` | Done — canvas promoted from `lblCanvas`, zoom in/out/fit, scale calibration, measurements table, CSV export, `view_closed` |
+| `LengthMeasurementPresenter` | Done — scale factor calc, table sync, delete/clear, CSV export |
+| `MeasurementCanvas` (`src/views/image_panel.py`) | Done — custom `QWidget` with `paintEvent`, click-to-measure two points, zoom, `measurement_completed`/`mouse_moved` signals |
+| `contour_detection_widget.ui` + `ContourDetectionView` | Done — load image, threshold/Canny method toggle, min-area filter, live-updating result + stats, Save Result, `view_closed` |
+| `ContourDetectionPresenter` | Done — loads image via `cv2.imread`, re-runs `ImageUtils.detect_contours()` on every param change |
 | `ImageModel` | Stub |
 
 ## Pending Work
@@ -282,13 +329,6 @@ YoloStudioView (two tabs)
 - [ ] Wire `MainView.btnVideo` → `MainApplication`.
 - [ ] Add `view_closed` signal to the view.
 
-### Length Measurement module (btnMeasure — not wired)
-- [ ] Create `image_panel.py` with `CanvasLabel(QLabel)` — override `mousePressEvent` to record clicked points.
-- [ ] Create `LengthMeasurementView` loading `length_measurement_widget.ui`.
-- [ ] Create `LengthMeasurementPresenter`.
-- [ ] Wire `MainView.btnMeasure` in `MainPresenter` and `MainApplication`.
-- [ ] Add `view_closed` signal to the view.
-
 ### Auth
 - [ ] Add credential validation to `LoginPresenter._handle_login` (currently lets anyone in).
 
@@ -296,3 +336,4 @@ YoloStudioView (two tabs)
 - [ ] `ImageComparisonResultView._save_result()` hardcodes `~/Pictures/mis_monedas` as the save directory — should use `~/Pictures` or be configurable.
 - [x] `src/presenters/comparison_presenter.py` was an empty (0-byte) dead file — deleted.
 - [x] `yolov8n.pt` (base YOLOv8 weights, ~6.5MB) moved from the repo root to `models/yolov8n.pt`; `YoloTrainer` now resolves the weights path from that folder instead of the process cwd.
+- [x] `length_measurement_widget.ui` used `<number>` (int) tags for `spinKnownPixels`/`spinRealLength` min/max/value, which are float properties on `QDoubleSpinBox` — PyQt6's `uic` raised `ValueError` trying to parse decimals. Changed to `<double>` tags.

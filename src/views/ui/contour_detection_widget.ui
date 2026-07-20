@@ -1,0 +1,197 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>ContourDetectionWidget</class>
+ <widget class="QWidget" name="ContourDetectionWidget">
+  <layout class="QHBoxLayout" name="mainLayout">
+   <property name="spacing"><number>12</number></property>
+   <property name="leftMargin"><number>16</number></property>
+   <property name="topMargin"><number>16</number></property>
+   <property name="rightMargin"><number>16</number></property>
+   <property name="bottomMargin"><number>16</number></property>
+
+   <item>
+    <layout class="QVBoxLayout" name="imageLayout">
+     <property name="spacing"><number>8</number></property>
+
+     <item>
+      <widget class="QPushButton" name="btnLoadImage">
+       <property name="text"><string>Load Image…</string></property>
+       <property name="minimumHeight"><number>32</number></property>
+      </widget>
+     </item>
+
+     <item>
+      <widget class="QLabel" name="lblImage">
+       <property name="text"><string>Load an image to detect contours</string></property>
+       <property name="alignment"><set>Qt::AlignmentFlag::AlignCenter</set></property>
+       <property name="minimumSize"><size><width>600</width><height>500</height></size></property>
+       <property name="scaledContents"><bool>false</bool></property>
+      </widget>
+     </item>
+
+     <item>
+      <widget class="QLabel" name="lblStats">
+       <property name="text"><string>Contours: — &#160;&#160; Total area: —</string></property>
+       <property name="alignment"><set>Qt::AlignmentFlag::AlignCenter</set></property>
+      </widget>
+     </item>
+
+    </layout>
+   </item>
+
+   <item>
+    <layout class="QVBoxLayout" name="controlsLayout">
+     <property name="spacing"><number>12</number></property>
+
+     <item>
+      <widget class="QGroupBox" name="groupMethod">
+       <property name="title"><string>Detection Method</string></property>
+       <property name="maximumWidth"><number>300</number></property>
+       <layout class="QVBoxLayout" name="layoutMethod">
+        <property name="spacing"><number>8</number></property>
+
+        <item>
+         <widget class="QRadioButton" name="rdoThreshold">
+          <property name="text"><string>Binary Threshold</string></property>
+          <property name="checked"><bool>true</bool></property>
+         </widget>
+        </item>
+        <item>
+         <layout class="QHBoxLayout" name="thresholdLayout">
+          <item>
+           <widget class="QLabel" name="lblThreshold">
+            <property name="text"><string>Threshold:</string></property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QSlider" name="sliderThreshold">
+            <property name="minimum"><number>0</number></property>
+            <property name="maximum"><number>255</number></property>
+            <property name="value"><number>127</number></property>
+            <property name="orientation"><enum>Qt::Orientation::Horizontal</enum></property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="lblThresholdValue">
+            <property name="minimumSize"><size><width>28</width><height>0</height></size></property>
+            <property name="text"><string>127</string></property>
+            <property name="alignment"><set>Qt::AlignmentFlag::AlignCenter</set></property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+
+        <item>
+         <widget class="QRadioButton" name="rdoCanny">
+          <property name="text"><string>Canny Edge Detection</string></property>
+         </widget>
+        </item>
+        <item>
+         <layout class="QHBoxLayout" name="cannyLowLayout">
+          <item>
+           <widget class="QLabel" name="lblCannyLow">
+            <property name="text"><string>Low:</string></property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QSlider" name="sliderCannyLow">
+            <property name="minimum"><number>0</number></property>
+            <property name="maximum"><number>255</number></property>
+            <property name="value"><number>50</number></property>
+            <property name="orientation"><enum>Qt::Orientation::Horizontal</enum></property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="lblCannyLowValue">
+            <property name="minimumSize"><size><width>28</width><height>0</height></size></property>
+            <property name="text"><string>50</string></property>
+            <property name="alignment"><set>Qt::AlignmentFlag::AlignCenter</set></property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+        <item>
+         <layout class="QHBoxLayout" name="cannyHighLayout">
+          <item>
+           <widget class="QLabel" name="lblCannyHigh">
+            <property name="text"><string>High:</string></property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QSlider" name="sliderCannyHigh">
+            <property name="minimum"><number>0</number></property>
+            <property name="maximum"><number>255</number></property>
+            <property name="value"><number>150</number></property>
+            <property name="orientation"><enum>Qt::Orientation::Horizontal</enum></property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="lblCannyHighValue">
+            <property name="minimumSize"><size><width>28</width><height>0</height></size></property>
+            <property name="text"><string>150</string></property>
+            <property name="alignment"><set>Qt::AlignmentFlag::AlignCenter</set></property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+
+       </layout>
+      </widget>
+     </item>
+
+     <item>
+      <widget class="QGroupBox" name="groupFilter">
+       <property name="title"><string>Filter</string></property>
+       <property name="maximumWidth"><number>300</number></property>
+       <layout class="QVBoxLayout" name="layoutFilter">
+        <property name="spacing"><number>8</number></property>
+        <item>
+         <layout class="QHBoxLayout" name="minAreaLayout">
+          <item>
+           <widget class="QLabel" name="lblMinArea">
+            <property name="text"><string>Min area (px²):</string></property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QSlider" name="sliderMinArea">
+            <property name="minimum"><number>0</number></property>
+            <property name="maximum"><number>5000</number></property>
+            <property name="value"><number>0</number></property>
+            <property name="orientation"><enum>Qt::Orientation::Horizontal</enum></property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="lblMinAreaValue">
+            <property name="minimumSize"><size><width>36</width><height>0</height></size></property>
+            <property name="text"><string>0</string></property>
+            <property name="alignment"><set>Qt::AlignmentFlag::AlignCenter</set></property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+       </layout>
+      </widget>
+     </item>
+
+     <item>
+      <widget class="QPushButton" name="btnSaveResult">
+       <property name="text"><string>Save Result…</string></property>
+       <property name="minimumHeight"><number>32</number></property>
+      </widget>
+     </item>
+
+     <item>
+      <spacer name="rightSpacer">
+       <property name="orientation"><enum>Qt::Vertical</enum></property>
+       <property name="sizeHint" stdset="0"><size><width>20</width><height>40</height></size></property>
+      </spacer>
+     </item>
+
+    </layout>
+   </item>
+
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

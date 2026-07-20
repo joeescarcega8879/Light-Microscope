@@ -1,0 +1,13 @@
+name: light-microscope
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - pip
+  - numpy>=2.4.6
+  - pyyaml>=6.0.3
+  - pip:
+      - PyQt6>=6.11.0
+      - opencv-python>=4.13.0
+      - ultralytics>=8.4.100
+      - modal>=1.5.2
