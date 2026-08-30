@@ -16,6 +16,8 @@ class DeviceCameraView(QWidget):
     recording_requested   = pyqtSignal(bool)
     load_model_requested  = pyqtSignal()
     detection_toggled     = pyqtSignal(bool)
+    reference_requested   = pyqtSignal()
+    anomaly_check_toggled = pyqtSignal(bool)
     view_closed           = pyqtSignal()
 
     def __init__(self):
@@ -33,7 +35,12 @@ class DeviceCameraView(QWidget):
         self.btnRecord.toggled.connect(self.recording_requested.emit)
         self.btnLoadModelCamera.clicked.connect(self.load_model_requested.emit)
         self.btnToggleDetection.toggled.connect(self.detection_toggled.emit)
-        
+        self.btnSetReference.clicked.connect(self.reference_requested.emit)
+        self.btnToggleAnomalyCheck.toggled.connect(self.anomaly_check_toggled.emit)
+        self.sliderAnomalySensitivity.valueChanged.connect(
+            lambda v: self.lblAnomalySensitivityValue.setText(str(v))
+        )
+
     def get_info_from_ui(self)-> dict:
         if self.rdb_by_quantity.isChecked():
             quantity_text = self.line_quantity.text()
@@ -103,11 +110,13 @@ class DeviceCameraView(QWidget):
         self.lblDetectionModel.setText(model_name)
         self.lblDetectionModel.setStyleSheet("color: green; font-size: 11px;")
         self.btnToggleDetection.setEnabled(True)
+        self.btnSetReference.setEnabled(True)
 
     def set_detection_model_failed(self, message: str):
         self.lblDetectionModel.setText(f"Error: {message}")
         self.lblDetectionModel.setStyleSheet("color: red; font-size: 11px;")
         self.btnToggleDetection.setEnabled(False)
+        self.btnSetReference.setEnabled(False)
 
     def set_detection_active(self, active: bool):
         self.btnToggleDetection.setText(
@@ -118,6 +127,20 @@ class DeviceCameraView(QWidget):
         self.lblDetectCount.setText(
             f"{count} detection(s)" if count > 0 else ""
         )
+
+    # ── reference / anomaly check ────────────────────────────
+
+    def get_anomaly_sensitivity(self) -> int:
+        return self.sliderAnomalySensitivity.value()
+
+    def set_reference_status(self, text: str):
+        self.lblReferenceStatus.setText(text)
+
+    def set_anomaly_stats(self, text: str):
+        self.lblAnomalyStats.setText(text)
+
+    def set_anomaly_check_enabled(self, enabled: bool):
+        self.btnToggleAnomalyCheck.setEnabled(enabled)
 
     def set_connected(self, connected: bool):
         self._updating_ui = True
@@ -135,6 +158,11 @@ class DeviceCameraView(QWidget):
             self.btnRecord.setChecked(False)
             self.btnRecord.setText("Record")
             self.lblTimer.setVisible(False)
+            self.btnToggleAnomalyCheck.setChecked(False)
+            self.btnToggleAnomalyCheck.setEnabled(False)
+            self.btnSetReference.setEnabled(False)
+            self.lblReferenceStatus.setText("No reference set")
+            self.lblAnomalyStats.setText("")
 
     def update_feed(self, pixmap: QPixmap):
         scaled = pixmap.scaled(

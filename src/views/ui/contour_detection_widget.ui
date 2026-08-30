@@ -83,6 +83,7 @@
 
         <item>
          <widget class="QRadioButton" name="rdoCanny">
+          <property name="visible"><bool>false</bool></property>
           <property name="text"><string>Canny Edge Detection</string></property>
          </widget>
         </item>
@@ -90,11 +91,13 @@
          <layout class="QHBoxLayout" name="cannyLowLayout">
           <item>
            <widget class="QLabel" name="lblCannyLow">
+            <property name="visible"><bool>false</bool></property>
             <property name="text"><string>Low:</string></property>
            </widget>
           </item>
           <item>
            <widget class="QSlider" name="sliderCannyLow">
+            <property name="visible"><bool>false</bool></property>
             <property name="minimum"><number>0</number></property>
             <property name="maximum"><number>255</number></property>
             <property name="value"><number>50</number></property>
@@ -103,6 +106,7 @@
           </item>
           <item>
            <widget class="QLabel" name="lblCannyLowValue">
+            <property name="visible"><bool>false</bool></property>
             <property name="minimumSize"><size><width>28</width><height>0</height></size></property>
             <property name="text"><string>50</string></property>
             <property name="alignment"><set>Qt::AlignmentFlag::AlignCenter</set></property>
@@ -114,11 +118,13 @@
          <layout class="QHBoxLayout" name="cannyHighLayout">
           <item>
            <widget class="QLabel" name="lblCannyHigh">
+            <property name="visible"><bool>false</bool></property>
             <property name="text"><string>High:</string></property>
            </widget>
           </item>
           <item>
            <widget class="QSlider" name="sliderCannyHigh">
+            <property name="visible"><bool>false</bool></property>
             <property name="minimum"><number>0</number></property>
             <property name="maximum"><number>255</number></property>
             <property name="value"><number>150</number></property>
@@ -127,8 +133,99 @@
           </item>
           <item>
            <widget class="QLabel" name="lblCannyHighValue">
+            <property name="visible"><bool>false</bool></property>
             <property name="minimumSize"><size><width>28</width><height>0</height></size></property>
             <property name="text"><string>150</string></property>
+            <property name="alignment"><set>Qt::AlignmentFlag::AlignCenter</set></property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+
+        <item>
+         <widget class="QRadioButton" name="rdoShapes">
+          <property name="text"><string>Circles &amp;&amp; Lines (Hough)</string></property>
+         </widget>
+        </item>
+
+       </layout>
+      </widget>
+     </item>
+
+     <item>
+      <widget class="QGroupBox" name="groupShapes">
+       <property name="title"><string>Shape Detection</string></property>
+       <property name="maximumWidth"><number>300</number></property>
+       <layout class="QVBoxLayout" name="layoutShapes">
+        <property name="spacing"><number>8</number></property>
+
+        <item>
+         <layout class="QHBoxLayout" name="minRadiusLayout">
+          <item>
+           <widget class="QLabel" name="lblMinRadius">
+            <property name="text"><string>Circle min r:</string></property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QSlider" name="sliderMinRadius">
+            <property name="minimum"><number>1</number></property>
+            <property name="maximum"><number>150</number></property>
+            <property name="value"><number>10</number></property>
+            <property name="orientation"><enum>Qt::Orientation::Horizontal</enum></property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="lblMinRadiusValue">
+            <property name="minimumSize"><size><width>28</width><height>0</height></size></property>
+            <property name="text"><string>10</string></property>
+            <property name="alignment"><set>Qt::AlignmentFlag::AlignCenter</set></property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+        <item>
+         <layout class="QHBoxLayout" name="maxRadiusLayout">
+          <item>
+           <widget class="QLabel" name="lblMaxRadius">
+            <property name="text"><string>Circle max r:</string></property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QSlider" name="sliderMaxRadius">
+            <property name="minimum"><number>10</number></property>
+            <property name="maximum"><number>400</number></property>
+            <property name="value"><number>100</number></property>
+            <property name="orientation"><enum>Qt::Orientation::Horizontal</enum></property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="lblMaxRadiusValue">
+            <property name="minimumSize"><size><width>28</width><height>0</height></size></property>
+            <property name="text"><string>100</string></property>
+            <property name="alignment"><set>Qt::AlignmentFlag::AlignCenter</set></property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+        <item>
+         <layout class="QHBoxLayout" name="minLineLengthLayout">
+          <item>
+           <widget class="QLabel" name="lblMinLineLength">
+            <property name="text"><string>Line min len:</string></property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QSlider" name="sliderMinLineLength">
+            <property name="minimum"><number>5</number></property>
+            <property name="maximum"><number>300</number></property>
+            <property name="value"><number>30</number></property>
+            <property name="orientation"><enum>Qt::Orientation::Horizontal</enum></property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="lblMinLineLengthValue">
+            <property name="minimumSize"><size><width>28</width><height>0</height></size></property>
+            <property name="text"><string>30</string></property>
             <property name="alignment"><set>Qt::AlignmentFlag::AlignCenter</set></property>
            </widget>
           </item>
@@ -141,6 +238,7 @@
 
      <item>
       <widget class="QGroupBox" name="groupFilter">
+       <property name="visible"><bool>false</bool></property>
        <property name="title"><string>Filter</string></property>
        <property name="maximumWidth"><number>300</number></property>
        <layout class="QVBoxLayout" name="layoutFilter">

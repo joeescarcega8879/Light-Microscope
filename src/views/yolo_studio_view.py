@@ -1,10 +1,13 @@
 import os
+import cv2
 from PyQt6 import uic
 from PyQt6.QtCore import pyqtSignal, Qt, QRect, QPoint
 from PyQt6.QtGui import (
-    QPainter, QPen, QBrush, QColor, QFont, QPixmap
+    QPainter, QPen, QBrush, QColor, QFont, QPixmap, QPolygon
 )
 from PyQt6.QtWidgets import QWidget, QVBoxLayout
+
+from ..utils.image_utils import ImageUtils
 
 # ──────────────────────────────────────────────────────────────
 # Per-class color palette
@@ -29,32 +32,46 @@ def _class_color(class_id: int) -> QColor:
 # Custom drawing canvas
 # ──────────────────────────────────────────────────────────────
 class LabelingCanvas(QWidget):
-    annotation_added = pyqtSignal(int, float, float, float, float)
+    annotation_added = pyqtSignal()
     annotation_removed = pyqtSignal(int)
+    pending_contour_changed = pyqtSignal(bool)   # True once a contour is selected, ready to confirm
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self._pixmap: QPixmap | None = None
-        self._annotations: list[tuple] = []   # (class_id, cx, cy, w, h)
+        self._cv_image = None   # np.ndarray BGR, same image as _pixmap, for contour detection
+        self._annotations: list[tuple] = []   # (class_id, points: list[(x, y)] normalized)
         self._class_names: list[str] = []
         self._active_class: int = 0
-        self._drawing = False
-        self._start = QPoint()
-        self._drag_rect = QRect()
+
+        # All contours detected on the *whole* current image, live — like the
+        # standalone Contour Detection module — plus which one is selected.
+        self._contours_px: list = []          # cv2 contours (pixel coords), for hit-testing
+        self._contours_norm: list = []        # same contours as normalized (x, y) point lists
+        self._selected_index: int | None = None
+
+        # Contour detection parameters, pushed in from the view's sliders.
+        self._use_canny = False
+        self._threshold = 127
+        self._canny_low = 50
+        self._canny_high = 150
+        self._min_area = 0
+
         self.setMinimumSize(300, 300)
-        self.setCursor(Qt.CursorShape.CrossCursor)
-        self.setMouseTracking(True)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
 
     # ── public API ────────────────────────────────────────────
 
     def set_image(self, pixmap: QPixmap):
         self._pixmap = pixmap
-        self.update()
+        self._cv_image = ImageUtils.qpixmap_to_numpy(pixmap)
+        self._recompute_contours()
 
     def clear_image(self):
         self._pixmap = None
+        self._cv_image = None
         self._annotations = []
-        self.update()
+        self._recompute_contours()
 
     def set_annotations(self, annotations: list[tuple]):
         self._annotations = list(annotations)
@@ -75,6 +92,25 @@ class LabelingCanvas(QWidget):
             self.annotation_removed.emit(index)
             self.update()
 
+    def set_contour_params(self, *, use_canny, threshold, canny_low, canny_high, min_area):
+        self._use_canny = use_canny
+        self._threshold = threshold
+        self._canny_low = canny_low
+        self._canny_high = canny_high
+        self._min_area = min_area
+        self._recompute_contours()
+
+    def confirm_pending_annotation(self):
+        if self._selected_index is None:
+            return
+        points = self._contours_norm[self._selected_index]
+        self._annotations.append((self._active_class, points))
+        self._set_selected(None)
+        self.annotation_added.emit()
+
+    def discard_pending_annotation(self):
+        self._set_selected(None)
+
     # ── coordinate helpers ────────────────────────────────────
 
     def _image_rect(self) -> tuple[int, int, int, int]:
@@ -90,21 +126,68 @@ class LabelingCanvas(QWidget):
         y = (self.height() - scaled.height()) // 2
         return x, y, scaled.width(), scaled.height()
 
-    def _to_yolo(self, screen: QRect) -> tuple[float, float, float, float]:
+    def _point_to_screen(self, x: float, y: float) -> QPoint:
         x0, y0, iw, ih = self._image_rect()
-        x1 = max(0.0, (screen.left() - x0) / iw)
-        y1 = max(0.0, (screen.top() - y0) / ih)
-        x2 = min(1.0, (screen.right() - x0) / iw)
-        y2 = min(1.0, (screen.bottom() - y0) / ih)
-        return (x1 + x2) / 2, (y1 + y2) / 2, x2 - x1, y2 - y1
+        return QPoint(int(x * iw) + x0, int(y * ih) + y0)
 
-    def _to_screen(self, cx, cy, w, h) -> QRect:
+    # ── contour detection (whole image, live) ─────────────────
+
+    def _set_selected(self, index: int | None):
+        self._selected_index = index
+        self.pending_contour_changed.emit(index is not None)
+        self.update()
+
+    def _recompute_contours(self):
+        """Re-runs contour detection on the whole image with the current params
+        — exactly like the standalone Contour Detection module's live preview."""
+        self._contours_px = []
+        self._contours_norm = []
+        self._selected_index = None
+
+        if self._cv_image is not None:
+            img_h, img_w = self._cv_image.shape[:2]
+            _, contours, _ = ImageUtils.detect_contours(
+                self._cv_image,
+                threshold=self._threshold,
+                use_canny=self._use_canny,
+                canny_low=self._canny_low,
+                canny_high=self._canny_high,
+                min_area=self._min_area,
+            )
+            for c in contours:
+                epsilon = 0.002 * cv2.arcLength(c, True)
+                approx = cv2.approxPolyDP(c, epsilon, True)
+                if len(approx) >= 3:
+                    self._contours_px.append(approx)
+                    self._contours_norm.append([
+                        (px / img_w, py / img_h) for px, py in approx.reshape(-1, 2)
+                    ])
+
+        self.pending_contour_changed.emit(False)
+        self.update()
+
+    def _contour_at(self, pos: QPoint) -> int | None:
+        """Returns the index of the smallest detected contour containing `pos`, or None."""
+        if self._cv_image is None or not self._contours_px:
+            return None
         x0, y0, iw, ih = self._image_rect()
-        x1 = int((cx - w / 2) * iw) + x0
-        y1 = int((cy - h / 2) * ih) + y0
-        x2 = int((cx + w / 2) * iw) + x0
-        y2 = int((cy + h / 2) * ih) + y0
-        return QRect(QPoint(x1, y1), QPoint(x2, y2))
+        if iw <= 0 or ih <= 0:
+            return None
+        nx = (pos.x() - x0) / iw
+        ny = (pos.y() - y0) / ih
+        if not (0.0 <= nx <= 1.0 and 0.0 <= ny <= 1.0):
+            return None
+
+        img_h, img_w = self._cv_image.shape[:2]
+        point = (nx * img_w, ny * img_h)
+
+        best_index, best_area = None, None
+        for i, contour in enumerate(self._contours_px):
+            if cv2.pointPolygonTest(contour, point, False) >= 0:
+                area = cv2.contourArea(contour)
+                if best_area is None or area < best_area:
+                    best_index, best_area = i, area
+        return best_index
 
     # ── paint ─────────────────────────────────────────────────
 
@@ -129,56 +212,45 @@ class LabelingCanvas(QWidget):
             font.setBold(True)
             painter.setFont(font)
 
-            for class_id, cx, cy, w, h in self._annotations:
+            for class_id, points in self._annotations:
                 color = _class_color(class_id)
-                rect = self._to_screen(cx, cy, w, h)
+                polygon = QPolygon([self._point_to_screen(x, y) for x, y in points])
                 painter.setPen(QPen(color, 2))
                 painter.setBrush(QBrush(Qt.BrushStyle.NoBrush))
-                painter.drawRect(rect)
+                painter.drawPolygon(polygon)
 
                 label = (
                     self._class_names[class_id]
                     if class_id < len(self._class_names)
                     else str(class_id)
                 )
+                bbox = polygon.boundingRect()
                 bg = QColor(color)
                 bg.setAlpha(200)
-                text_rect = QRect(rect.left(), rect.top() - 17, len(label) * 8 + 8, 17)
+                text_rect = QRect(bbox.left(), bbox.top() - 17, len(label) * 8 + 8, 17)
                 painter.fillRect(text_rect, bg)
                 painter.setPen(QPen(Qt.GlobalColor.white))
                 painter.drawText(text_rect, Qt.AlignmentFlag.AlignCenter, label)
 
-        # box being drawn
-        if self._drawing and not self._drag_rect.isNull():
-            pen = QPen(Qt.GlobalColor.yellow, 2, Qt.PenStyle.DashLine)
-            painter.setPen(pen)
+            # live preview: every contour the current threshold/canny params detect
+            painter.setPen(QPen(QColor(0, 200, 255), 1))
             painter.setBrush(QBrush(Qt.BrushStyle.NoBrush))
-            painter.drawRect(self._drag_rect)
+            for i, points in enumerate(self._contours_norm):
+                if i == self._selected_index:
+                    continue
+                painter.drawPolygon(QPolygon([self._point_to_screen(x, y) for x, y in points]))
+
+            # the one the user clicked on, highlighted, awaiting confirmation
+            if self._selected_index is not None:
+                points = self._contours_norm[self._selected_index]
+                painter.setPen(QPen(Qt.GlobalColor.yellow, 3))
+                painter.drawPolygon(QPolygon([self._point_to_screen(x, y) for x, y in points]))
 
     # ── mouse ──────────────────────────────────────────────────
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton and self._pixmap:
-            self._drawing = True
-            self._start = event.pos()
-            self._drag_rect = QRect(self._start, self._start)
-
-    def mouseMoveEvent(self, event):
-        if self._drawing:
-            self._drag_rect = QRect(self._start, event.pos()).normalized()
-            self.update()
-
-    def mouseReleaseEvent(self, event):
-        if event.button() == Qt.MouseButton.LeftButton and self._drawing:
-            self._drawing = False
-            rect = QRect(self._start, event.pos()).normalized()
-            if rect.width() > 8 and rect.height() > 8:
-                cx, cy, w, h = self._to_yolo(rect)
-                if w > 0.01 and h > 0.01:
-                    self._annotations.append((self._active_class, cx, cy, w, h))
-                    self.annotation_added.emit(self._active_class, cx, cy, w, h)
-            self._drag_rect = QRect()
-            self.update()
+            self._set_selected(self._contour_at(event.pos()))
 
 
 # ──────────────────────────────────────────────────────────────
@@ -202,9 +274,9 @@ class YoloStudioView(QWidget):
         layout.addWidget(self.canvas)
         self.canvasFrame.setLayout(layout)
 
-        # Training — model options
-        self.cmbModel.addItem("YOLOv8 Nano  (fastest, CPU-friendly)", "yolov8n")
-        self.cmbModel.addItem("YOLOv8 Small (more accurate, slower)", "yolov8s")
+        # Training — model options (segmentation variants: annotations are contours/polygons)
+        self.cmbModel.addItem("YOLOv8 Nano-Seg  (fastest, CPU-friendly)", "yolov8n-seg")
+        self.cmbModel.addItem("YOLOv8 Small-Seg (more accurate, slower)", "yolov8s-seg")
 
         # Slider live labels
         self.sliderEpochs.valueChanged.connect(
@@ -220,9 +292,50 @@ class YoloStudioView(QWidget):
         self.rdoColab.toggled.connect(self._on_backend_changed)
         self._on_backend_changed()  # set initial state
 
-        # Detect — confidence slider live label
-        self.sliderConfidence.valueChanged.connect(
-            lambda v: self.lblConfidence.setText(f"{v} %")
+        # Contour detection controls (Annotate tab) — drive the canvas's live preview
+        self.rdoAnnThreshold.toggled.connect(self._on_contour_params_changed)
+        self.rdoAnnCanny.toggled.connect(self._on_contour_params_changed)
+        self.sliderAnnThreshold.valueChanged.connect(self._on_ann_threshold_changed)
+        self.sliderAnnCannyLow.valueChanged.connect(self._on_ann_canny_low_changed)
+        self.sliderAnnCannyHigh.valueChanged.connect(self._on_ann_canny_high_changed)
+        self.sliderAnnMinArea.valueChanged.connect(self._on_ann_min_area_changed)
+        self.canvas.pending_contour_changed.connect(self._on_pending_contour_changed)
+        self._on_contour_params_changed()  # push initial slider values to the canvas
+
+    # ── contour detection helpers ─────────────────────────────
+
+    def _on_ann_threshold_changed(self, value: int):
+        self.lblAnnThresholdValue.setText(str(value))
+        self._on_contour_params_changed()
+
+    def _on_ann_canny_low_changed(self, value: int):
+        self.lblAnnCannyLowValue.setText(str(value))
+        self._on_contour_params_changed()
+
+    def _on_ann_canny_high_changed(self, value: int):
+        self.lblAnnCannyHighValue.setText(str(value))
+        self._on_contour_params_changed()
+
+    def _on_ann_min_area_changed(self, value: int):
+        self.lblAnnMinAreaValue.setText(str(value))
+        self._on_contour_params_changed()
+
+    def _on_contour_params_changed(self):
+        self.canvas.set_contour_params(
+            use_canny=self.rdoAnnCanny.isChecked(),
+            threshold=self.sliderAnnThreshold.value(),
+            canny_low=self.sliderAnnCannyLow.value(),
+            canny_high=self.sliderAnnCannyHigh.value(),
+            min_area=self.sliderAnnMinArea.value(),
+        )
+
+    def _on_pending_contour_changed(self, has_contour: bool):
+        self.btnAddAnnotation.setEnabled(has_contour)
+        self.btnDiscardAnnotation.setEnabled(has_contour)
+        self.lblContourStatus.setText(
+            "Contour selected — click Add Annotation."
+            if has_contour
+            else "Adjust the threshold until the piece's outline looks right, then click it."
         )
 
     # ── annotation helpers ────────────────────────────────────
@@ -240,38 +353,9 @@ class YoloStudioView(QWidget):
     def refresh_annotations_list(self):
         self.lstAnnotations.clear()
         names = self.class_names()
-        for class_id, cx, cy, w, h in self.canvas.get_annotations():
+        for class_id, points in self.canvas.get_annotations():
             label = names[class_id] if class_id < len(names) else str(class_id)
-            self.lstAnnotations.addItem(
-                f"{label}  ({cx:.2f}, {cy:.2f})  {w:.2f}×{h:.2f}"
-            )
-
-    # ── detect helpers ────────────────────────────────────────
-
-    def confidence(self) -> float:
-        return self.sliderConfidence.value() / 100.0
-
-    def set_model_loaded(self, model_path: str):
-        import os
-        self.lblModelLoaded.setText(os.path.basename(model_path))
-        self.lblModelLoaded.setStyleSheet("color: green; font-size: 11px;")
-        self.btnDetect.setEnabled(True)
-        self.lblDetectStatus.setText("")
-
-    def set_model_load_failed(self, message: str):
-        self.lblModelLoaded.setText("Load failed")
-        self.lblModelLoaded.setStyleSheet("color: red; font-size: 11px;")
-        self.btnDetect.setEnabled(False)
-        self.lblDetectStatus.setText(message)
-
-    def set_detect_result(self, count: int):
-        if count == 0:
-            self.lblDetectStatus.setText("No detections found.")
-        else:
-            self.lblDetectStatus.setText(f"{count} detection(s) found.")
-
-    def set_detect_failed(self, message: str):
-        self.lblDetectStatus.setText(f"Error: {message}")
+            self.lstAnnotations.addItem(f"{label}  ({len(points)} pts)")
 
     # ── backend helpers ───────────────────────────────────────
 

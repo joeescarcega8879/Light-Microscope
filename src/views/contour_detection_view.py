@@ -28,10 +28,14 @@ class ContourDetectionView(QWidget):
         self.btnSaveResult.clicked.connect(self._save_result)
 
         self.rdoThreshold.toggled.connect(self.detection_params_changed.emit)
+        self.rdoShapes.toggled.connect(self.detection_params_changed.emit)
         self.sliderThreshold.valueChanged.connect(self._on_threshold_changed)
         self.sliderCannyLow.valueChanged.connect(self._on_canny_low_changed)
         self.sliderCannyHigh.valueChanged.connect(self._on_canny_high_changed)
         self.sliderMinArea.valueChanged.connect(self._on_min_area_changed)
+        self.sliderMinRadius.valueChanged.connect(self._on_min_radius_changed)
+        self.sliderMaxRadius.valueChanged.connect(self._on_max_radius_changed)
+        self.sliderMinLineLength.valueChanged.connect(self._on_min_line_length_changed)
 
     def _on_threshold_changed(self, value: int):
         self.lblThresholdValue.setText(str(value))
@@ -47,6 +51,18 @@ class ContourDetectionView(QWidget):
 
     def _on_min_area_changed(self, value: int):
         self.lblMinAreaValue.setText(str(value))
+        self.detection_params_changed.emit()
+
+    def _on_min_radius_changed(self, value: int):
+        self.lblMinRadiusValue.setText(str(value))
+        self.detection_params_changed.emit()
+
+    def _on_max_radius_changed(self, value: int):
+        self.lblMaxRadiusValue.setText(str(value))
+        self.detection_params_changed.emit()
+
+    def _on_min_line_length_changed(self, value: int):
+        self.lblMinLineLengthValue.setText(str(value))
         self.detection_params_changed.emit()
 
     # ── image loading ────────────────────────────────────────
@@ -70,6 +86,18 @@ class ContourDetectionView(QWidget):
 
     def get_min_area(self) -> int:
         return self.sliderMinArea.value()
+
+    def get_use_shapes(self) -> bool:
+        return self.rdoShapes.isChecked()
+
+    def get_min_radius(self) -> int:
+        return self.sliderMinRadius.value()
+
+    def get_max_radius(self) -> int:
+        return self.sliderMaxRadius.value()
+
+    def get_min_line_length(self) -> int:
+        return self.sliderMinLineLength.value()
 
     # ── result display ───────────────────────────────────────
 

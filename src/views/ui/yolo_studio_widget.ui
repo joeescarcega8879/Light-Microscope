@@ -256,50 +256,40 @@
             </widget>
            </item>
            <item>
-            <widget class="QGroupBox" name="groupDetect">
+            <widget class="QGroupBox" name="groupContourParams">
              <property name="title">
-              <string>Detect</string>
+              <string>Contour Detection</string>
              </property>
-             <layout class="QVBoxLayout" name="detectLayout">
+             <layout class="QVBoxLayout" name="contourParamsLayout">
               <item>
-               <widget class="QLabel" name="lblModelLoaded">
-                <property name="styleSheet">
-                 <string>color: gray; font-size: 11px;</string>
-                </property>
+               <widget class="QRadioButton" name="rdoAnnThreshold">
                 <property name="text">
-                 <string>No model loaded</string>
+                 <string>Binary Threshold</string>
                 </property>
-                <property name="wordWrap">
+                <property name="checked">
                  <bool>true</bool>
                 </property>
                </widget>
               </item>
               <item>
-               <widget class="QPushButton" name="btnLoadModel">
-                <property name="text">
-                 <string>Load Model (best.pt)…</string>
-                </property>
-               </widget>
-              </item>
-              <item>
-               <layout class="QHBoxLayout">
+               <layout class="QHBoxLayout" name="annThresholdLayout">
                 <item>
-                 <widget class="QLabel" name="label">
+                 <widget class="QLabel" name="label_2">
                   <property name="text">
-                   <string>Confidence:</string>
+                   <string>Threshold:</string>
                   </property>
                  </widget>
                 </item>
                 <item>
-                 <widget class="QSlider" name="sliderConfidence">
+                 <widget class="QSlider" name="sliderAnnThreshold">
                   <property name="minimum">
-                   <number>1</number>
+                   <number>0</number>
                   </property>
                   <property name="maximum">
-                   <number>99</number>
+                   <number>255</number>
                   </property>
                   <property name="value">
-                   <number>25</number>
+                   <number>127</number>
                   </property>
                   <property name="orientation">
                    <enum>Qt::Orientation::Horizontal</enum>
@@ -307,9 +297,9 @@
                  </widget>
                 </item>
                 <item>
-                 <widget class="QLabel" name="lblConfidence">
+                 <widget class="QLabel" name="lblAnnThresholdValue">
                   <property name="text">
-                   <string>25 %</string>
+                   <string>127</string>
                   </property>
                   <property name="alignment">
                    <set>Qt::AlignmentFlag::AlignCenter</set>
@@ -319,27 +309,159 @@
                </layout>
               </item>
               <item>
-               <widget class="QPushButton" name="btnDetect">
-                <property name="enabled">
-                 <bool>false</bool>
-                </property>
+               <widget class="QRadioButton" name="rdoAnnCanny">
                 <property name="text">
-                 <string>Run Detection</string>
+                 <string>Canny Edge Detection</string>
                 </property>
                </widget>
               </item>
               <item>
-               <widget class="QLabel" name="lblDetectStatus">
+               <layout class="QHBoxLayout" name="annCannyLowLayout">
+                <item>
+                 <widget class="QLabel" name="label_3">
+                  <property name="text">
+                   <string>Low:</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QSlider" name="sliderAnnCannyLow">
+                  <property name="minimum">
+                   <number>0</number>
+                  </property>
+                  <property name="maximum">
+                   <number>255</number>
+                  </property>
+                  <property name="value">
+                   <number>50</number>
+                  </property>
+                  <property name="orientation">
+                   <enum>Qt::Orientation::Horizontal</enum>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QLabel" name="lblAnnCannyLowValue">
+                  <property name="text">
+                   <string>50</string>
+                  </property>
+                  <property name="alignment">
+                   <set>Qt::AlignmentFlag::AlignCenter</set>
+                  </property>
+                 </widget>
+                </item>
+               </layout>
+              </item>
+              <item>
+               <layout class="QHBoxLayout" name="annCannyHighLayout">
+                <item>
+                 <widget class="QLabel" name="label_4">
+                  <property name="text">
+                   <string>High:</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QSlider" name="sliderAnnCannyHigh">
+                  <property name="minimum">
+                   <number>0</number>
+                  </property>
+                  <property name="maximum">
+                   <number>255</number>
+                  </property>
+                  <property name="value">
+                   <number>150</number>
+                  </property>
+                  <property name="orientation">
+                   <enum>Qt::Orientation::Horizontal</enum>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QLabel" name="lblAnnCannyHighValue">
+                  <property name="text">
+                   <string>150</string>
+                  </property>
+                  <property name="alignment">
+                   <set>Qt::AlignmentFlag::AlignCenter</set>
+                  </property>
+                 </widget>
+                </item>
+               </layout>
+              </item>
+              <item>
+               <layout class="QHBoxLayout" name="annMinAreaLayout">
+                <item>
+                 <widget class="QLabel" name="label_5">
+                  <property name="text">
+                   <string>Min area (px²):</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QSlider" name="sliderAnnMinArea">
+                  <property name="minimum">
+                   <number>0</number>
+                  </property>
+                  <property name="maximum">
+                   <number>5000</number>
+                  </property>
+                  <property name="value">
+                   <number>0</number>
+                  </property>
+                  <property name="orientation">
+                   <enum>Qt::Orientation::Horizontal</enum>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QLabel" name="lblAnnMinAreaValue">
+                  <property name="text">
+                   <string>0</string>
+                  </property>
+                  <property name="alignment">
+                   <set>Qt::AlignmentFlag::AlignCenter</set>
+                  </property>
+                 </widget>
+                </item>
+               </layout>
+              </item>
+              <item>
+               <widget class="QLabel" name="lblContourStatus">
                 <property name="styleSheet">
-                 <string>font-size: 11px;</string>
+                 <string>color: gray; font-size: 11px;</string>
                 </property>
                 <property name="text">
-                 <string/>
+                 <string>Adjust the threshold until the piece's outline looks right, then click it.</string>
                 </property>
                 <property name="wordWrap">
                  <bool>true</bool>
                 </property>
                </widget>
+              </item>
+              <item>
+               <layout class="QHBoxLayout" name="contourActionsLayout">
+                <item>
+                 <widget class="QPushButton" name="btnAddAnnotation">
+                  <property name="enabled">
+                   <bool>false</bool>
+                  </property>
+                  <property name="text">
+                   <string>Add Annotation</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QPushButton" name="btnDiscardAnnotation">
+                  <property name="enabled">
+                   <bool>false</bool>
+                  </property>
+                  <property name="text">
+                   <string>Discard</string>
+                  </property>
+                 </widget>
+                </item>
+               </layout>
               </item>
              </layout>
             </widget>

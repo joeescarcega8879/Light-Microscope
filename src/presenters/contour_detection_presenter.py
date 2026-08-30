@@ -28,6 +28,12 @@ class ContourDetectionPresenter:
         self._run_detection()
 
     def _run_detection(self):
+        if self.view.get_use_shapes():
+            self._run_shape_detection()
+        else:
+            self._run_contour_detection()
+
+    def _run_contour_detection(self):
         contour_img, contours, _ = ImageUtils.detect_contours(
             self._image,
             threshold=self.view.get_threshold(),
@@ -40,3 +46,16 @@ class ContourDetectionPresenter:
 
         total_area = sum(cv2.contourArea(c) for c in contours)
         self.view.set_stats(f"Contours: {len(contours)}   Total area: {total_area:.0f} px²")
+
+    def _run_shape_detection(self):
+        shapes_img, circles, lines = ImageUtils.detect_shapes(
+            self._image,
+            min_radius=self.view.get_min_radius(),
+            max_radius=self.view.get_max_radius(),
+            min_line_length=self.view.get_min_line_length(),
+        )
+        self.view.display_result(shapes_img)
+
+        circle_count = 0 if circles is None else len(circles)
+        line_count = 0 if lines is None else len(lines)
+        self.view.set_stats(f"Circles: {circle_count}   Lines: {line_count}")

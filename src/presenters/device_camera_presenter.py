@@ -1,6 +1,7 @@
 import os
 import cv2
 import time
+import numpy as np
 from pathlib import Path
 from uuid import uuid4
 from typing import Optional
@@ -11,7 +12,7 @@ from PyQt6.QtWidgets import QFileDialog
 
 from ..models.device_camera_startup import DeviceCameraStartup
 from ..models.yolo_inferencer import YoloInferencer
-from ..utils.image_utils import TypeCapture
+from ..utils.image_utils import TypeCapture, ImageUtils
 
 # Per-class color palette for detection boxes (BGR order doesn't matter here — these are QColors)
 _DET_COLORS = [
@@ -27,6 +28,12 @@ _DET_COLORS = [
 
 # Run inference every N raw frames (throttle — CPU inference ~100ms each)
 _INFERENCE_EVERY_N_FRAMES = 5
+
+# Reference / anomaly check
+_MISMATCH_COLOR = QColor(255, 0, 0)     # pure red — distinct from crimson already in _DET_COLORS
+_ANOMALY_COLOR = QColor(255, 255, 0)    # pure yellow — not present in _DET_COLORS
+_MATCH_DISTANCE_CUTOFF = 0.15           # normalized centroid distance beyond which a live det is unmatched
+_ANOMALY_PIXEL_PCT_CUTOFF = 8.0         # % changed pixels in a matched crop above which it's "anomaly"
 
 
 class DeviceCameraPresenter(QObject):
@@ -50,6 +57,13 @@ class DeviceCameraPresenter(QObject):
         self._last_detections: list = []
         self._raw_frame_counter: int = 0
 
+        # reference / anomaly check
+        self._last_raw_frame: Optional[np.ndarray] = None
+        self._reference_frame: Optional[np.ndarray] = None
+        self._reference_detections: list = []
+        self._anomaly_check_enabled: bool = False
+        self._last_status_by_index: dict = {}
+
         self._connect_signals()
 
     def _connect_signals(self):
@@ -59,6 +73,8 @@ class DeviceCameraPresenter(QObject):
         self.view.view_closed.connect(self._stop_capture)
         self.view.load_model_requested.connect(self._load_detection_model)
         self.view.detection_toggled.connect(self._toggle_detection)
+        self.view.reference_requested.connect(self._on_set_reference)
+        self.view.anomaly_check_toggled.connect(self._toggle_anomaly_check)
 
     def _on_connect_requested(self, camera_index: int):
         if camera_index >= 0:
@@ -80,6 +96,9 @@ class DeviceCameraPresenter(QObject):
         self._frame_count = 0
         self._fps_timer.start(1000)
 
+        if self._inferencer.is_loaded():
+            self.view.set_detection_model_loaded(os.path.basename(self._inferencer.model_path()))
+
     def _stop_capture(self):
         if self._recording:
             self._stop_recording()
@@ -96,6 +115,12 @@ class DeviceCameraPresenter(QObject):
         self.view.lblFps.setText("FPS: --")
         self.view.lblResolution.setText("-- x --")
 
+        self._last_raw_frame = None
+        self._reference_frame = None
+        self._reference_detections = []
+        self._anomaly_check_enabled = False
+        self._last_status_by_index = {}
+
     def _on_capture_finished(self):
         self._stop_capture()
 
@@ -105,12 +130,14 @@ class DeviceCameraPresenter(QObject):
         self._frame_count += 1
 
         if self._detection_enabled and self._last_detections:
-            pixmap = self._draw_detections(pixmap, self._last_detections)
+            pixmap = self._draw_detections(pixmap, self._last_detections, self._last_status_by_index)
 
         self.view.update_feed(pixmap)
 
     @pyqtSlot(object)
     def _on_raw_frame(self, frame):
+        self._last_raw_frame = frame
+
         # recording
         if self._recording and self._video_writer is not None:
             self._video_writer.write(frame)
@@ -125,6 +152,19 @@ class DeviceCameraPresenter(QObject):
                     self.view.set_detect_count(len(self._last_detections))
                 except Exception:
                     self._last_detections = []
+
+                if self._anomaly_check_enabled and self._reference_frame is not None:
+                    self._last_status_by_index, counts = self._compare_to_reference(
+                        frame, self._last_detections,
+                        self._reference_frame, self._reference_detections,
+                        self.view.get_anomaly_sensitivity(),
+                    )
+                    ok, anomaly, mismatch, missing = counts
+                    self.view.set_anomaly_stats(
+                        f"{ok} ok · {anomaly} anomaly · {mismatch} mismatch · {missing} missing"
+                    )
+                else:
+                    self._last_status_by_index = {}
 
     def _update_fps(self):
         self.view.lblFps.setText(f"FPS: {self._frame_count}")
@@ -235,8 +275,108 @@ class DeviceCameraPresenter(QObject):
         if not enabled:
             self.view.set_detect_count(0)
 
+    # ── reference / anomaly check ─────────────────────────────
+
+    def _on_set_reference(self):
+        if self._last_raw_frame is None or not self._inferencer.is_loaded():
+            print("No live frame / model available to set as reference")
+            return
+        try:
+            detections = self._inferencer.predict_frame(self._last_raw_frame)
+        except Exception:
+            detections = []
+
+        self._reference_frame = self._last_raw_frame.copy()
+        self._reference_detections = detections
+        self.view.set_reference_status(
+            f"Reference: {len(detections)} piece(s)" if detections else "Reference: 0 pieces (empty scene)"
+        )
+        self.view.set_anomaly_check_enabled(True)
+
+    def _toggle_anomaly_check(self, enabled: bool):
+        self._anomaly_check_enabled = enabled
+        self._last_status_by_index = {}
+        if not enabled:
+            self.view.set_anomaly_stats("")
+
     @staticmethod
-    def _draw_detections(pixmap: QPixmap, detections: list) -> QPixmap:
+    def _compare_to_reference(frame, detections: list, reference_frame, reference_detections: list,
+                              sensitivity: int) -> tuple[dict, tuple[int, int, int, int]]:
+        """
+        Matches live detections to reference detections by class + nearest centroid.
+
+        Returns (status_by_index, (ok, anomaly, mismatch, missing)):
+          - status_by_index maps index into `detections` -> "ok" | "anomaly" | "mismatch"
+          - missing: reference detections with no matching live detection (nothing to draw)
+        """
+        ref_by_class: dict = {}
+        for cls_id, _, _, cx, cy, w, h in reference_detections:
+            ref_by_class.setdefault(cls_id, []).append((cx, cy, w, h))
+
+        live_by_class: dict = {}
+        for i, det in enumerate(detections):
+            live_by_class.setdefault(det[0], []).append(i)
+
+        status_by_index: dict = {}
+        ok = anomaly = mismatch = missing = 0
+
+        for cls_id in set(ref_by_class) | set(live_by_class):
+            remaining_ref = list(ref_by_class.get(cls_id, []))
+
+            for i in live_by_class.get(cls_id, []):
+                _, _, _, cx, cy, w, h = detections[i]
+                best_idx, best_dist = None, None
+                for r_idx, (rcx, rcy, rw, rh) in enumerate(remaining_ref):
+                    dist = ((cx - rcx) ** 2 + (cy - rcy) ** 2) ** 0.5
+                    if best_dist is None or dist < best_dist:
+                        best_idx, best_dist = r_idx, dist
+
+                if best_idx is None or best_dist > _MATCH_DISTANCE_CUTOFF:
+                    status_by_index[i] = "mismatch"
+                    mismatch += 1
+                    continue
+
+                ref_box = remaining_ref.pop(best_idx)
+                status = DeviceCameraPresenter._classify_crop(
+                    reference_frame, ref_box, frame, (cx, cy, w, h), sensitivity
+                )
+                status_by_index[i] = status
+                if status == "anomaly":
+                    anomaly += 1
+                else:
+                    ok += 1
+
+            missing += len(remaining_ref)
+
+        return status_by_index, (ok, anomaly, mismatch, missing)
+
+    @staticmethod
+    def _classify_crop(ref_frame, ref_box, live_frame, live_box, sensitivity: int) -> str:
+        ref_crop = DeviceCameraPresenter._crop(ref_frame, *ref_box)
+        live_crop = DeviceCameraPresenter._crop(live_frame, *live_box)
+        if ref_crop is None or live_crop is None:
+            return "ok"
+
+        if live_crop.shape[:2] != ref_crop.shape[:2]:
+            live_crop = cv2.resize(live_crop, (ref_crop.shape[1], ref_crop.shape[0]))
+
+        _, binary_mask, _ = ImageUtils.compute_diff(ref_crop, live_crop, threshold=sensitivity)
+        changed_pct = 100.0 * np.count_nonzero(binary_mask) / binary_mask.size
+        return "anomaly" if changed_pct > _ANOMALY_PIXEL_PCT_CUTOFF else "ok"
+
+    @staticmethod
+    def _crop(frame, cx, cy, w, h):
+        fh, fw = frame.shape[:2]
+        x1 = max(0, int((cx - w / 2) * fw))
+        y1 = max(0, int((cy - h / 2) * fh))
+        x2 = min(fw, int((cx + w / 2) * fw))
+        y2 = min(fh, int((cy + h / 2) * fh))
+        if x2 <= x1 or y2 <= y1:
+            return None
+        return frame[y1:y2, x1:x2]
+
+    @staticmethod
+    def _draw_detections(pixmap: QPixmap, detections: list, status_by_index: Optional[dict] = None) -> QPixmap:
         """Draws bounding boxes + labels on a copy of pixmap."""
         result  = pixmap.copy()
         painter = QPainter(result)
@@ -250,8 +390,16 @@ class DeviceCameraPresenter(QObject):
         font.setBold(True)
         painter.setFont(font)
 
-        for cls_id, name, conf, cx, cy, bw, bh in detections:
-            color = _DET_COLORS[cls_id % len(_DET_COLORS)]
+        status_by_index = status_by_index or {}
+
+        for i, (cls_id, name, conf, cx, cy, bw, bh) in enumerate(detections):
+            status = status_by_index.get(i, "ok")
+            if status == "mismatch":
+                color = _MISMATCH_COLOR
+            elif status == "anomaly":
+                color = _ANOMALY_COLOR
+            else:
+                color = _DET_COLORS[cls_id % len(_DET_COLORS)]
 
             x1 = int((cx - bw / 2) * pw)
             y1 = int((cy - bh / 2) * ph)
@@ -264,7 +412,9 @@ class DeviceCameraPresenter(QObject):
             painter.drawRect(x1, y1, x2 - x1, y2 - y1)
 
             # label background + text
-            label     = f"{name}  {conf:.0%}"
+            label = f"{name}  {conf:.0%}"
+            if status in ("mismatch", "anomaly"):
+                label += f"  [{status.upper()}]"
             label_w   = len(label) * 8 + 6
             label_h   = 18
             label_y   = max(0, y1 - label_h)

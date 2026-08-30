@@ -1,3 +1,5 @@
+import os
+from ultralytics import YOLO
 from PyQt6.QtCore import QThread, pyqtSignal
 
 
@@ -16,9 +18,6 @@ class YoloTrainer(QThread):
 
     def run(self):
         try:
-            from ultralytics import YOLO
-            import os
-
             models_dir = os.path.join(
                 os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
                 "models",

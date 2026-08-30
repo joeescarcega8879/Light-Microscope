@@ -10,26 +10,30 @@ class YoloUtils:
 
     @staticmethod
     def load_labels(label_path: str) -> list[tuple]:
-        """Load YOLO .txt labels → list of (class_id, cx, cy, w, h)."""
+        """Load YOLO-segmentation .txt labels → list of (class_id, points).
+
+        Each line is `class_id x1 y1 x2 y2 ... xn yn` (normalized polygon,
+        n >= 3 points).
+        """
         labels = []
         if os.path.exists(label_path):
             with open(label_path) as f:
                 for line in f:
                     parts = line.strip().split()
-                    if len(parts) == 5:
-                        labels.append((
-                            int(parts[0]),
-                            float(parts[1]), float(parts[2]),
-                            float(parts[3]), float(parts[4]),
-                        ))
+                    if len(parts) >= 7 and len(parts) % 2 == 1:
+                        class_id = int(parts[0])
+                        coords = [float(v) for v in parts[1:]]
+                        points = list(zip(coords[0::2], coords[1::2]))
+                        labels.append((class_id, points))
         return labels
 
     @staticmethod
     def save_labels(labels: list[tuple], label_path: str):
-        """Save list of (class_id, cx, cy, w, h) to YOLO .txt format."""
+        """Save list of (class_id, points) to YOLO-segmentation .txt format."""
         with open(label_path, "w") as f:
-            for class_id, cx, cy, w, h in labels:
-                f.write(f"{class_id} {cx:.6f} {cy:.6f} {w:.6f} {h:.6f}\n")
+            for class_id, points in labels:
+                coords = " ".join(f"{x:.6f} {y:.6f}" for x, y in points)
+                f.write(f"{class_id} {coords}\n")
 
     @staticmethod
     def prepare_dataset(

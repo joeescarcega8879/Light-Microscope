@@ -7,7 +7,6 @@ from PyQt6.QtWidgets import QFileDialog, QMessageBox
 from ..models.yolo_trainer import YoloTrainer
 from ..models.cloud_yolo_trainer import CloudYoloTrainer
 from ..models.colab_exporter import ColabExporter
-from ..models.yolo_inferencer import YoloInferencer
 from ..utils.yolo_utils import YoloUtils
 
 
@@ -20,7 +19,6 @@ class YoloStudioPresenter(QObject):
         self._folder_path: str = ""
         self._trainer: YoloTrainer | CloudYoloTrainer | None = None
         self._colab_export_dir: str = ""
-        self._inferencer: YoloInferencer = YoloInferencer()
         self._connect_signals()
 
     def _connect_signals(self):
@@ -37,11 +35,9 @@ class YoloStudioPresenter(QObject):
         v.lstClasses.currentRowChanged.connect(self._on_class_selected)
         v.btnDeleteAnnotation.clicked.connect(self._delete_annotation)
         v.btnApplyToAll.clicked.connect(self._apply_to_all)
+        v.btnAddAnnotation.clicked.connect(lambda: v.canvas.confirm_pending_annotation())
+        v.btnDiscardAnnotation.clicked.connect(lambda: v.canvas.discard_pending_annotation())
         v.canvas.annotation_added.connect(lambda *_: self._on_annotation_changed())
-
-        # detect
-        v.btnLoadModel.clicked.connect(self._load_model)
-        v.btnDetect.clicked.connect(self._run_detection)
 
         # training tab
         v.btnBrowseDataset.clicked.connect(self._browse_dataset)
@@ -210,55 +206,6 @@ class YoloStudioPresenter(QObject):
         folder = QFileDialog.getExistingDirectory(self.view, "Select Output Folder")
         if folder:
             self.view.lineOutputDir.setText(folder)
-
-    # ── inference ─────────────────────────────────────────────
-
-    def _load_model(self):
-        path, _ = QFileDialog.getOpenFileName(
-            self.view,
-            "Load trained model",
-            str(Path.home() / "Downloads"),
-            "PyTorch model (*.pt);;All files (*)",
-        )
-        if not path:
-            return
-        try:
-            self._inferencer.load_model(path)
-            self.view.set_model_loaded(path)
-        except RuntimeError as exc:
-            self.view.set_model_load_failed(str(exc))
-
-    def _run_detection(self):
-        if self._current_index < 0 or not self._image_paths:
-            self.view.set_detect_failed("Load an image folder first.")
-            return
-        if not self._inferencer.is_loaded():
-            self.view.set_detect_failed("Load a model first.")
-            return
-
-        image_path = self._image_paths[self._current_index]
-        try:
-            detections = self._inferencer.predict(
-                image_path,
-                confidence=self.view.confidence(),
-            )
-        except RuntimeError as exc:
-            self.view.set_detect_failed(str(exc))
-            return
-
-        # Convert detections to YOLO annotation format and push to canvas
-        # (class_id, cx, cy, w, h) — same tuple the canvas already uses
-        annotations = [
-            (cls_id, cx, cy, w, h)
-            for cls_id, _name, _conf, cx, cy, w, h in detections
-        ]
-        self.view.canvas.set_annotations(annotations)
-        self.view.canvas.set_class_names(
-            [name for _id, name, *_ in detections]
-            if detections else self.view.class_names()
-        )
-        self.view.refresh_annotations_list()
-        self.view.set_detect_result(len(detections))
 
     # ── training dispatch ──────────────────────────────────────
 
