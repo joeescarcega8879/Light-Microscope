@@ -1,4 +1,14 @@
-.vscode/
-.claude/
 __pycache__/
 *.pyc
+.vscode/
+.claude/
+
+# model weights (downloaded on demand by ultralytics)
+*.pt
+
+# build / tooling
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+.venv/

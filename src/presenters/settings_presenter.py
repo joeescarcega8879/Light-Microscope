@@ -1,4 +1,5 @@
 from ..utils.theme_manager import ThemeManager
+from ..utils import app_settings
 
 
 class SettingsPresenter:
@@ -11,4 +12,5 @@ class SettingsPresenter:
         self.view.theme_selected.connect(self._on_theme_selected)
 
     def _on_theme_selected(self, theme_name: str):
-        self._theme_manager.apply_theme(theme_name)
+        if self._theme_manager.apply_theme(theme_name):
+            app_settings.set_theme(theme_name)

@@ -1,6 +1,11 @@
 import os
+import logging
 from ultralytics import YOLO
 from PyQt6.QtCore import QThread, pyqtSignal
+
+from ..utils.platform_utils import default_torch_device
+
+log = logging.getLogger(__name__)
 
 
 class YoloTrainer(QThread):
@@ -39,11 +44,14 @@ class YoloTrainer(QThread):
 
             model.add_callback("on_train_epoch_end", _on_epoch_end)
 
+            device = default_torch_device()
+            log.info("Training %s for %d epochs on device=%s", self._model_name, self._epochs, device)
+            self.log_message.emit(f"Training on device: {device}")
             model.train(
                 data=self._data_yaml,
                 epochs=self._epochs,
                 imgsz=640,
-                device="cpu",
+                device=device,
                 project=self._output_dir,
                 name="run",
                 exist_ok=True,
@@ -61,4 +69,5 @@ class YoloTrainer(QThread):
                 "ultralytics not installed.\nRun: pip install ultralytics"
             )
         except Exception as exc:
+            log.exception("Training failed")
             self.training_failed.emit(str(exc))

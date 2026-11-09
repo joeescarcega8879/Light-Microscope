@@ -1,7 +1,6 @@
 import os
 import sys
-from PyQt6.QtCore import QTimer
-from PyQt6.QtWidgets import QApplication, QWidget
+from PyQt6.QtWidgets import QApplication
 
 from src.views.main_view import MainView
 from src.views.login_view import LoginView
@@ -23,21 +22,16 @@ from src.presenters.length_measurement_presenter import LengthMeasurementPresent
 from src.presenters.contour_detection_presenter import ContourDetectionPresenter
 
 from src.utils.theme_manager import ThemeManager
+from src.utils import app_settings
+from src.utils.logging_config import setup_logging
 
 
 class MainApplication:
-    @staticmethod
-    def _open_maximized(widget: QWidget):
-        # GNOME/Mutter (and other X11 WMs) ignore a maximize request sent in the
-        # same tick as widget construction/show() — the window isn't mapped yet.
-        # A short real delay lets the WM finish that negotiation first.
-        widget.show()
-        QTimer.singleShot(100, widget.showMaximized)
-
     def __init__(self):
         css_dir = os.path.join(os.path.dirname(__file__), "src", "assets", "css")
         self._theme_manager = ThemeManager(css_dir)
-        self._theme_manager.apply_theme("light")
+        if not self._theme_manager.apply_theme(app_settings.get_theme()):
+            self._theme_manager.apply_theme("light")
         self.open_login_view()
 
     def open_login_view(self):
@@ -50,12 +44,10 @@ class MainApplication:
     def _initialize_main_window(self):
         self.main_window = MainView()
         self.main_presenter = MainPresenter(self.main_window, self)
-        # self._open_maximized(self.main_window)
         self.main_window.show()
         self.login_view.close()
 
     def _show_dashboard(self):
-        # self._open_maximized(self.main_window)
         self.main_window.show()
 
     def open_camera_view(self):
@@ -66,7 +58,6 @@ class MainApplication:
         self.main_window.hide()
         self.device_camera_view.setWindowTitle("Video Capture")
         self.device_camera_view.show()
-        # self._open_maximized(self.device_camera_view)
 
     def open_image_comparison_view(self):
         self.image_comparison_view = ImageComparisonView()
@@ -75,7 +66,6 @@ class MainApplication:
 
         self.main_window.hide()
         self.image_comparison_view.setWindowTitle("Image Comparison")
-        # self._open_maximized(self.image_comparison_view)
         self.image_comparison_view.show()
 
     def open_comparison_result_view(self, diff, heatmap, contour_img, stats_text: str):
@@ -85,7 +75,6 @@ class MainApplication:
         self.comparison_result_view.display_contours(contour_img)
         self.comparison_result_view.set_stats(stats_text)
         self.comparison_result_view.setWindowTitle("Comparison Results")
-        # self._open_maximized(self.comparison_result_view)
         self.comparison_result_view.show()
 
     def open_ai_studio_view(self):
@@ -94,7 +83,6 @@ class MainApplication:
         self.ai_studio_view.view_closed.connect(self._show_dashboard)
         self.main_window.hide()
         self.ai_studio_view.setWindowTitle("AI Studio — Annotate & Train")
-        # self._open_maximized(self.ai_studio_view)
         self.ai_studio_view.show()
 
     def open_length_measurement_view(self):
@@ -104,7 +92,6 @@ class MainApplication:
 
         self.main_window.hide()
         self.length_measurement_view.setWindowTitle("Length Measurement")
-        # self._open_maximized(self.length_measurement_view)
         self.length_measurement_view.show()
 
     def open_contour_detection_view(self):
@@ -114,7 +101,6 @@ class MainApplication:
 
         self.main_window.hide()
         self.contour_detection_view.setWindowTitle("Contour Detection")
-        # self._open_maximized(self.contour_detection_view)
         self.contour_detection_view.show()
 
     def open_settings_dialog(self):
@@ -126,6 +112,9 @@ class MainApplication:
 
 
 if __name__ == "__main__":
+    setup_logging()
     app = QApplication(sys.argv)
+    app.setOrganizationName(app_settings.ORGANIZATION)
+    app.setApplicationName(app_settings.APPLICATION)
     main_application = MainApplication()
     app.exec()

@@ -1,6 +1,7 @@
 import os
 import cv2
 import glob
+import logging
 import platform
 from PyQt6 import uic
 from PyQt6.QtCore import pyqtSignal, Qt
@@ -8,6 +9,8 @@ from PyQt6.QtWidgets import QWidget
 from PyQt6.QtGui import QPixmap
 
 from ..utils.image_utils import TypePlatform
+
+log = logging.getLogger(__name__)
 
 
 class DeviceCameraView(QWidget):
@@ -49,7 +52,7 @@ class DeviceCameraView(QWidget):
                 quantity = int(quantity_text)
                 return {"mode": "quantity", "value": quantity, "model_name": model_name}
             except ValueError:
-                print("Invalid quantity input. Please enter a valid integer.")
+                log.warning("Invalid quantity input. Please enter a valid integer.")
                 return None
 
     def _on_connect_toggled(self, checked):

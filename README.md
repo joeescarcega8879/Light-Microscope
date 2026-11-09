@@ -1,72 +1,64 @@
 # Light Microscope
 
-Desktop application for microscopy image and video analysis. Built with Python and PyQt6.
+Desktop application (Python + PyQt6) for inspecting small parts under a microscope: compare images, detect and measure contours, and train YOLO models to recognise parts.
 
 ## Features
 
-- **Image Comparison** — Load two images side by side, detect pixel-level differences, and view a difference heatmap with adjustable sensitivity.
-- **Video Comparison** — Load a video and select two frames to compare with the same diff/heatmap engine.
-- **Length Measurement** — Mark two points on a microscope image and get the real-world distance after calibrating the pixel-to-unit scale (µm, mm, nm, px).
+- **Image Comparison**: load two images, get the pixel difference, a heatmap and the changed contours, with adjustable sensitivity.
+- **Live camera** ("Create Video and Images"): capture snapshots and video, run a trained YOLO model live (inference runs in a background thread), and flag pieces that differ from a reference frame.
+- **AI Studio**: annotate parts (auto-detected contours become segmentation polygons), build a YOLO dataset and train it locally, on Modal cloud GPUs, or export a Google Colab notebook.
+- **Contour Detection**: threshold or Canny contours with a minimum-area filter.
+- **Length Measurement**: calibrate pixels to µm/mm/nm, measure by two clicks, export to CSV.
+- **Themes**: light, dark, blue, high contrast (your choice is remembered).
 
 ## Requirements
 
-- Python 3.10+
-- PyQt6
-- OpenCV (`opencv-python`)
-- NumPy
+- Python 3.10+ (developed on 3.11)
+- Dependencies in `requirements.txt` (PyQt6, OpenCV, NumPy, PyYAML, ultralytics, modal)
+- Optional: a CUDA GPU (local training picks `cuda`, then `mps`, then `cpu` automatically)
 
 ## Installation
 
 ```bash
-# Clone the repository
 git clone <repo-url>
 cd Light-Microscope
-
-# Create and activate a virtual environment
 python -m venv .venv
 source .venv/bin/activate   # Windows: .venv\Scripts\activate
-
-# Install dependencies
 pip install -r requirements.txt
 ```
+
+Or with conda: `conda env create -f environment.yml`.
 
 ## Usage
 
 ```bash
-python main.py
+python main_application.py
 ```
 
-Use the sidebar icons to switch between the three analysis panels.
+YOLO base weights (`yolov8n.pt`, `yolov8s.pt`) are downloaded by ultralytics on first training and stored in `models/` (not tracked in git).
 
-## Project Structure
+Logs are written to `~/.light_microscope/logs/light_microscope.log`. User settings (theme) are stored with `QSettings`.
+
+## Tests
+
+```bash
+pip install -r requirements-dev.txt
+python -m pytest
+```
+
+## Project structure
 
 ```
 Light-Microscope/
-├── main.py                        # Entry point
+├── main_application.py     # Entry point, window/navigation wiring
 ├── requirements.txt
+├── tests/                  # pytest suite (runs headless)
 └── src/
-    ├── models/
-    │   └── image_model.py         # Image/video data and processing logic
-    ├── presenters/
-    │   └── comparison_presenter.py # Mediates between views and models
-    ├── utils/
-    │   └── image_utils.py         # OpenCV helpers (diff, heatmap, scale)
-    └── views/
-        ├── main_window.py         # Main window shell, sidebar navigation
-        ├── image_panel.py         # Custom canvas widget for measurement
-        └── ui/
-            ├── main_window.ui
-            ├── image_comparison_widget.ui
-            ├── video_comparison_widget.ui
-            └── length_measurement_widget.ui
+    ├── models/             # Camera thread, inference worker, YOLO train/infer, cloud export
+    ├── presenters/         # Logic between views and models
+    ├── utils/              # image_utils, yolo_utils, theme/settings/logging helpers
+    ├── views/              # Qt widgets (+ ui/ Qt Designer files)
+    └── assets/css/         # QSS themes
 ```
 
-## Architecture
-
-The project follows the **Model-View-Presenter (MVP)** pattern:
-
-| Layer | Responsibility |
-|---|---|
-| **Model** | Data structures, image loading, diff computation |
-| **View** | Qt widgets, `.ui` files, no business logic |
-| **Presenter** | Reacts to view events, updates models, pushes results back to views |
+The project follows Model-View-Presenter: views hold widgets only, presenters react to view signals and drive models. See `CONTEXT.md` for contributor details.

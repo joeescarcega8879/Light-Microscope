@@ -1,6 +1,7 @@
 import os
 import cv2
 import time
+import logging
 import numpy as np
 from pathlib import Path
 from uuid import uuid4
@@ -12,6 +13,7 @@ from PyQt6.QtWidgets import QFileDialog
 
 from ..models.device_camera_startup import DeviceCameraStartup
 from ..models.yolo_inferencer import YoloInferencer
+from ..models.inference_worker import InferenceWorker
 from ..utils.image_utils import TypeCapture, ImageUtils
 
 # Per-class color palette for detection boxes (BGR order doesn't matter here — these are QColors)
@@ -26,7 +28,9 @@ _DET_COLORS = [
     QColor(147, 112, 219),  # medium purple
 ]
 
-# Run inference every N raw frames (throttle — CPU inference ~100ms each)
+log = logging.getLogger(__name__)
+
+# Submit a frame for inference every N raw frames (inference itself runs in a worker thread)
 _INFERENCE_EVERY_N_FRAMES = 5
 
 # Reference / anomaly check
@@ -56,6 +60,7 @@ class DeviceCameraPresenter(QObject):
         self._detection_enabled: bool = False
         self._last_detections: list = []
         self._raw_frame_counter: int = 0
+        self._inference_worker: Optional[InferenceWorker] = None
 
         # reference / anomaly check
         self._last_raw_frame: Optional[np.ndarray] = None
@@ -92,6 +97,9 @@ class DeviceCameraPresenter(QObject):
         self._capture_thread.finished.connect(self._on_capture_finished)
         self._capture_thread.start()
 
+        if self._detection_enabled:
+            self._start_inference_worker()
+
         self.view.set_connected(True)
         self._frame_count = 0
         self._fps_timer.start(1000)
@@ -100,6 +108,7 @@ class DeviceCameraPresenter(QObject):
             self.view.set_detection_model_loaded(os.path.basename(self._inferencer.model_path()))
 
     def _stop_capture(self):
+        self._stop_inference_worker()
         if self._recording:
             self._stop_recording()
 
@@ -142,29 +151,32 @@ class DeviceCameraPresenter(QObject):
         if self._recording and self._video_writer is not None:
             self._video_writer.write(frame)
 
-        # live detection — run every N frames to avoid blocking the UI
-        if self._detection_enabled and self._inferencer.is_loaded():
+        # live detection — submit every N frames to the worker thread (never blocks the UI)
+        if self._detection_enabled and self._inference_worker is not None:
             self._raw_frame_counter += 1
-            if self._raw_frame_counter >= _INFERENCE_EVERY_N_FRAMES:
+            if self._raw_frame_counter >= _INFERENCE_EVERY_N_FRAMES and not self._inference_worker.busy():
                 self._raw_frame_counter = 0
-                try:
-                    self._last_detections = self._inferencer.predict_frame(frame)
-                    self.view.set_detect_count(len(self._last_detections))
-                except Exception:
-                    self._last_detections = []
+                self._inference_worker.submit(frame)
 
-                if self._anomaly_check_enabled and self._reference_frame is not None:
-                    self._last_status_by_index, counts = self._compare_to_reference(
-                        frame, self._last_detections,
-                        self._reference_frame, self._reference_detections,
-                        self.view.get_anomaly_sensitivity(),
-                    )
-                    ok, anomaly, mismatch, missing = counts
-                    self.view.set_anomaly_stats(
-                        f"{ok} ok · {anomaly} anomaly · {mismatch} mismatch · {missing} missing"
-                    )
-                else:
-                    self._last_status_by_index = {}
+    @pyqtSlot(object, object)
+    def _on_inference_result(self, frame, detections):
+        if not self._detection_enabled:
+            return
+        self._last_detections = detections
+        self.view.set_detect_count(len(detections))
+
+        if self._anomaly_check_enabled and self._reference_frame is not None:
+            self._last_status_by_index, counts = self._compare_to_reference(
+                frame, detections,
+                self._reference_frame, self._reference_detections,
+                self.view.get_anomaly_sensitivity(),
+            )
+            ok, anomaly, mismatch, missing = counts
+            self.view.set_anomaly_stats(
+                f"{ok} ok · {anomaly} anomaly · {mismatch} mismatch · {missing} missing"
+            )
+        else:
+            self._last_status_by_index = {}
 
     def _update_fps(self):
         self.view.lblFps.setText(f"FPS: {self._frame_count}")
@@ -172,14 +184,14 @@ class DeviceCameraPresenter(QObject):
 
     def _take_snapshot(self):
         if self._current_pixmap is None:
-            print("No image to save")
+            log.warning("No image to save")
             return
         
         take_by_quantity = self.view.get_info_from_ui()
         if take_by_quantity is not None:
             quantity = take_by_quantity.get("value")
             model_name = take_by_quantity.get("model_name")
-            print(f"Taking {quantity} snapshots based on user input.")
+            log.info("Taking %d snapshots based on user input.", quantity)
             
             for i in range(quantity):
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -187,7 +199,7 @@ class DeviceCameraPresenter(QObject):
                 os.makedirs(mkdir_path, exist_ok=True)
                 filename = os.path.join(os.path.expanduser(f"~/Pictures/{model_name}"), f"microscope_{uuid4()}_{i+1}.png")
                 self._current_pixmap.save(filename)
-                print(f"Snapshot {i+1} saved to {filename}")
+                log.info("Snapshot %d saved to %s", i + 1, filename)
             return
 
         pictures_dir = os.path.expanduser("~/Pictures")
@@ -195,12 +207,12 @@ class DeviceCameraPresenter(QObject):
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = os.path.join(pictures_dir, f"microscope_{timestamp}.png")
         self._current_pixmap.save(filename)
-        print(f"Snapshot saved to {filename}")
+        log.info("Snapshot saved to %s", filename)
         
     def _take_by_custom_quantity(self):
         
         if self._current_pixmap is None:
-            print("No image to save")
+            log.warning("No image to save")
             return
         
         pictures_dir = os.path.expanduser("~/Pictures/mis_monedas")
@@ -262,13 +274,29 @@ class DeviceCameraPresenter(QObject):
             return
         try:
             self._inferencer.load_model(path)
-            import os
             self.view.set_detection_model_loaded(os.path.basename(path))
+            if self._detection_enabled:
+                self._start_inference_worker()
         except RuntimeError as exc:
             self.view.set_detection_model_failed(str(exc))
 
+    def _start_inference_worker(self):
+        if self._inference_worker is None and self._inferencer.is_loaded():
+            self._inference_worker = InferenceWorker(self._inferencer)
+            self._inference_worker.result_ready.connect(self._on_inference_result)
+            self._inference_worker.start()
+
+    def _stop_inference_worker(self):
+        if self._inference_worker is not None:
+            self._inference_worker.stop()
+            self._inference_worker = None
+
     def _toggle_detection(self, enabled: bool):
         self._detection_enabled = enabled
+        if enabled:
+            self._start_inference_worker()
+        else:
+            self._stop_inference_worker()
         self._last_detections = []
         self._raw_frame_counter = 0
         self.view.set_detection_active(enabled)
@@ -279,11 +307,12 @@ class DeviceCameraPresenter(QObject):
 
     def _on_set_reference(self):
         if self._last_raw_frame is None or not self._inferencer.is_loaded():
-            print("No live frame / model available to set as reference")
+            log.warning("No live frame / model available to set as reference")
             return
         try:
             detections = self._inferencer.predict_frame(self._last_raw_frame)
         except Exception:
+            log.exception("Reference inference failed")
             detections = []
 
         self._reference_frame = self._last_raw_frame.copy()

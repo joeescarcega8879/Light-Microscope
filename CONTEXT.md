@@ -69,7 +69,7 @@ src/
 │   ├── modal_trainer.py         # Modal app definition: train_yolo() remote function + local_entrypoint(); GPU A10G, Volumes: yolo-microscope-data / yolo-microscope-weights
 │   ├── colab_exporter.py        # ColabExporter.export(): zips dataset + generates pre-configured colab_trainer.ipynb; no QThread (runs on main thread)
 │   ├── yolo_inferencer.py       # YoloInferencer: load_model(path), predict(image_path), predict_frame(np_frame); wraps ultralytics YOLO for inference (no QThread)
-│   └── image_model.py           # Stub: will load images/video, run diff, heatmap, measurement
+│   ├── inference_worker.py      # InferenceWorker (QThread): runs YoloInferencer.predict_frame off the GUI thread; keeps only the latest frame; emits result_ready(frame, detections)
 │
 ├── presenters/
 │   ├── login_presenter.py              # Wires LoginView.login_requested → on_login_success callback
@@ -105,7 +105,6 @@ src/
         ├── image_comparison_widget.ui          # lblImageA/B, btnLoadA/B, btnCompare, sliderThreshold, lblThresholdValue
         ├── image_comparison_result_widget.ui   # lblDiff, lblHeatmap, lblContours, lblStats, btnSaveResult
         ├── yolo_studio_widget.ui               # Two-tab QWidget: Annotate (canvasFrame, lstClasses, lstAnnotations, groupContourParams: rdoAnnThreshold/rdoAnnCanny + threshold/canny/min-area sliders, btnAddAnnotation/btnDiscardAnnotation) + Train (backend selector, model [-seg variants], epochs, val split, progress, log)
-        ├── video_comparison_widget.ui          # Video loader, two frame pickers, diff/heatmap output
         ├── length_measurement_widget.ui        # Canvas (lblCanvas placeholder, promoted to MeasurementCanvas in code) + scale calibration + measurements table
         └── contour_detection_widget.ui         # lblImage, btnLoadImage, method radios (rdoThreshold/rdoCanny/rdoShapes), threshold/canny/min-area/circle-radius/line-length sliders, lblStats, btnSaveResult
 ```
@@ -247,7 +246,7 @@ YoloStudioView (two tabs)
               └─ backend == "modal"
                     ↓ CloudYoloTrainer(QThread).start()
                           ↓ check modal CLI + auth
-                          ↓ zip dataset_dir → /tmp/yolo_microscope_upload.zip
+                          ↓ zip dataset_dir → <system temp>/yolo_microscope_upload.zip
                           ↓ modal volume put yolo-microscope-data → /dataset.zip
                           ↓ modal run modal_trainer.py (subprocess, stdout parsed line by line)
                           │     → [EPOCH] lines → epoch_ended signal (progress bar updates live)
@@ -260,7 +259,7 @@ YoloStudioView (two tabs)
                     ↓ generates colab_trainer.ipynb (model/epochs/val_split pre-filled)
                     ↓ saves both to colab_export/ inside user-chosen folder
                     ↓ log area shows step-by-step instructions for the user
-        btnOpenModelFolder → xdg-open output_dir/run  (or colab_export/ after export)
+        btnOpenModelFolder → open_folder() (QDesktopServices) output_dir/run  (or colab_export/ after export)
 ```
 
 ## Length Measurement Flow
@@ -350,7 +349,6 @@ ContourDetectionView
 | `ColabExporter` | Done — generates `dataset.zip` + pre-configured `colab_trainer.ipynb`; runs synchronously on main thread; unchanged for segmentation |
 | `YoloInferencer` | Done — `load_model()`, `predict()` (image file), `predict_frame()` (numpy BGR); only used by camera live detection now (AI Studio's own "Detect" button was removed). Reads `result.boxes` only — works unchanged whether the loaded checkpoint is a detect or `-seg` model. |
 | `YoloUtils` | Done — `load_labels()`, `save_labels()` (YOLO-segmentation polygon format: `class_id x1 y1 ... xn yn`), `prepare_dataset()`, `load_class_names()`, `save_class_names()` |
-| `video_comparison_widget.ui` | UI file exists, no view/presenter yet |
 | `length_measurement_widget.ui` + `LengthMeasurementView` | Done — canvas promoted from `lblCanvas`, zoom in/out/fit, scale calibration, measurements table, CSV export, `view_closed` |
 | `LengthMeasurementPresenter` | Done — scale factor calc, table sync, delete/clear, CSV export |
 | `MeasurementCanvas` (`src/views/image_panel.py`) | Done — custom `QWidget` with `paintEvent`, click-to-measure two points, zoom, `measurement_completed`/`mouse_moved` signals |
@@ -385,7 +383,7 @@ just unreachable from the UI. `rdoThreshold` is the only reachable method alongs
 `rdoShapes` (Hough circles/lines).
 
 ### Video module — resolved 2026-07-21
-Real-time model-based comparison landed inside the existing **"Create Video and Images"** module (`btnVideo` → `DeviceCameraView`/`DeviceCameraPresenter`) — see `## Live Detection & Anomaly Check Flow` above. No new view was added. `video_comparison_widget.ui` (loader + frame A/B pickers + diff/heatmap) remains unused — that recorded-video-frame-diff workflow was explicitly rejected in favor of the live reference/anomaly check.
+Real-time model-based comparison landed inside the existing **"Create Video and Images"** module (`btnVideo` → `DeviceCameraView`/`DeviceCameraPresenter`) — see `## Live Detection & Anomaly Check Flow` above. No new view was added. The `video_comparison_widget.ui` file was removed; that recorded-video-frame-diff workflow was explicitly rejected in favor of the live reference/anomaly check.
 
 ### Auth
 - [ ] Add credential validation to `LoginPresenter._handle_login` (currently lets anyone in).
@@ -395,3 +393,11 @@ Real-time model-based comparison landed inside the existing **"Create Video and 
 - [x] `src/presenters/comparison_presenter.py` was an empty (0-byte) dead file — deleted.
 - [x] `yolov8n.pt` (base YOLOv8 weights, ~6.5MB) moved from the repo root to `models/yolov8n.pt`; `YoloTrainer` now resolves the weights path from that folder instead of the process cwd.
 - [x] `length_measurement_widget.ui` used `<number>` (int) tags for `spinKnownPixels`/`spinRealLength` min/max/value, which are float properties on `QDoubleSpinBox` — PyQt6's `uic` raised `ValueError` trying to parse decimals. Changed to `<double>` tags.
+
+## Infrastructure (Phase 0)
+
+- **Live inference threading**: `DeviceCameraPresenter._on_raw_frame` only *submits* every Nth frame to `src/models/inference_worker.py` (`InferenceWorker`, a QThread that keeps just the latest frame). Results return via `result_ready(frame, detections)` → `_on_inference_result`, which also runs the reference/anomaly comparison on the frame the detections belong to. The worker starts when detection is enabled with a model loaded, and stops on disable / camera stop.
+- **Logging**: `src/utils/logging_config.py` (`setup_logging()` in `main_application.py`) → console + rotating file `~/.light_microscope/logs/light_microscope.log`. Use `log = logging.getLogger(__name__)`, not `print`.
+- **Settings**: `src/utils/app_settings.py` wraps `QSettings` (theme persisted; `get_last_dir`/`set_last_dir` helpers available).
+- **Platform helpers**: `src/utils/platform_utils.py` — `open_folder()` (cross-platform) and `default_torch_device()` (cuda → mps → cpu), used by `YoloTrainer`.
+- **Tests**: `tests/` (pytest, headless via `QT_QPA_PLATFORM=offscreen`); CI in `.github/workflows/ci.yml`. Weights (`*.pt`) are gitignored.

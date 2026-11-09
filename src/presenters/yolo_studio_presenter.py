@@ -8,6 +8,7 @@ from ..models.yolo_trainer import YoloTrainer
 from ..models.cloud_yolo_trainer import CloudYoloTrainer
 from ..models.colab_exporter import ColabExporter
 from ..utils.yolo_utils import YoloUtils
+from ..utils.platform_utils import open_folder
 
 
 class YoloStudioPresenter(QObject):
@@ -363,5 +364,4 @@ class YoloStudioPresenter(QObject):
             output_dir = self.view.output_dir()
             run_dir    = os.path.join(output_dir, "run")
             folder     = run_dir if os.path.isdir(run_dir) else output_dir
-        import subprocess
-        subprocess.Popen(["xdg-open", folder])
+        open_folder(folder)
