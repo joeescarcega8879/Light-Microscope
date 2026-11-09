@@ -5,6 +5,8 @@ from typing import Optional
 from PyQt6.QtCore import QObject
 from PyQt6.QtWidgets import QFileDialog, QInputDialog, QMessageBox
 
+from ..data.history import HistoryRepository
+from ..data.session import Session
 from ..inspection.engine import inspect_against_references
 from ..inspection.imageio import IMAGE_EXTS, read_image
 from ..inspection.reference import ReferenceSet, ReferenceStore
@@ -17,10 +19,15 @@ _IMG_FILTER = "Images (" + " ".join(f"*{e}" for e in sorted(IMAGE_EXTS)) + ")"
 
 
 class PartInspectionPresenter(QObject):
-    def __init__(self, view, store: Optional[ReferenceStore] = None):
+    def __init__(self, view, store: Optional[ReferenceStore] = None,
+                 session: Optional[Session] = None, history: Optional[HistoryRepository] = None):
         super().__init__()
         self.view = view
         self._store = store or ReferenceStore()
+        self._session = session
+        self._history = history
+        self._can_edit = session is None or session.can("edit_references")
+        self.view.set_editing_enabled(self._can_edit)
         self._ref: Optional[ReferenceSet] = None
         self._ref_images: list = []
         self._items: list = []
@@ -35,6 +42,8 @@ class PartInspectionPresenter(QObject):
         v.add_golden_requested.connect(self._add_golden)
         v.delete_reference_requested.connect(self._delete_reference)
         v.save_settings_requested.connect(self._save_settings)
+        v.export_reference_requested.connect(self._export_reference)
+        v.import_reference_requested.connect(self._import_reference)
         v.browse_input_requested.connect(self._browse_input)
         v.browse_output_requested.connect(self._browse_output)
         v.run_requested.connect(self._run)
@@ -43,6 +52,10 @@ class PartInspectionPresenter(QObject):
         v.row_selected.connect(self._preview_item)
         v.filter_changed.connect(self._apply_filter)
         v.view_closed.connect(self._cancel_and_wait)
+
+    def _audit(self, action: str, detail: str = ""):
+        if self._session is not None:
+            self._session.audit(action, detail)
 
     # ── references ──
     def _refresh_names(self, current: str = ""):
@@ -79,6 +92,8 @@ class PartInspectionPresenter(QObject):
             f"'{self._ref.name}': {n} golden image(s). A part passes if it matches any of them.")
 
     def _new_reference(self):
+        if not self._can_edit:
+            return
         name, ok = QInputDialog.getText(self.view, "New reference", "Product / reference name:")
         if not ok or not name.strip():
             return
@@ -96,9 +111,12 @@ class PartInspectionPresenter(QObject):
         except (FileExistsError, ValueError, OSError) as exc:
             self._warn(str(exc))
             return
+        self._audit("reference_created", ref.name)
         self._refresh_names(ref.name)
 
     def _add_golden(self):
+        if not self._can_edit:
+            return
         if self._ref is None:
             self._warn("Create or select a reference first.")
             return
@@ -111,15 +129,17 @@ class PartInspectionPresenter(QObject):
                 self._store.add_image(self._ref, img)
                 added += 1
         if added:
+            self._audit("reference_image_added", f"{self._ref.name} (+{added})")
             self._select_reference(self._ref.name)
 
     def _delete_reference(self):
-        if self._ref is None:
+        if not self._can_edit or self._ref is None:
             return
         answer = QMessageBox.question(self.view, "Delete reference",
                                       f"Delete reference '{self._ref.name}' and its images?")
         if answer == QMessageBox.StandardButton.Yes:
             self._store.delete(self._ref.name)
+            self._audit("reference_deleted", self._ref.name)
             self._ref = None
             self._refresh_names()
 
@@ -128,11 +148,48 @@ class PartInspectionPresenter(QObject):
         self._ref.rois = self.view.rois()
 
     def _save_settings(self):
-        if self._ref is None:
+        if not self._can_edit or self._ref is None:
             return
         self._apply_ui_to_ref()
         self._store.save_settings(self._ref)
+        self._audit("reference_rules_saved", self._ref.name)
         self.view.set_reference_info(f"Saved areas and rules to '{self._ref.name}'.")
+
+    def _export_reference(self):
+        if self._ref is None or not self._can_edit:
+            return
+        path, _ = QFileDialog.getSaveFileName(self.view, "Export reference",
+                                              str(Path.home() / f"{self._ref.name}.zip"), "Reference (*.zip)")
+        if path:
+            try:
+                self._store.export_zip(self._ref.name, path)
+            except (OSError, FileNotFoundError) as exc:
+                self._warn(str(exc))
+                return
+            self._audit("reference_exported", f"{self._ref.name} -> {path}")
+            self.view.set_reference_info(f"Exported '{self._ref.name}' to {path}")
+
+    def _import_reference(self):
+        if not self._can_edit:
+            return
+        path, _ = QFileDialog.getOpenFileName(self.view, "Import reference", str(Path.home()), "Reference (*.zip)")
+        if not path:
+            return
+        name, ok = QInputDialog.getText(self.view, "Import reference", "Name for the imported reference:",
+                                        text=Path(path).stem)
+        if not ok or not name.strip():
+            return
+        try:
+            ref = self._store.import_zip(path, name)
+        except (FileExistsError, ValueError, OSError) as exc:
+            self._warn(str(exc))
+            return
+        except Exception as exc:      # corrupt zip, bad json, ...
+            log.exception("Import failed")
+            self._warn(f"Could not import this file:\n{exc}")
+            return
+        self._audit("reference_imported", f"{ref.name} <- {path}")
+        self._refresh_names(ref.name)
 
     # ── batch ──
     def _browse_input(self):
@@ -157,8 +214,11 @@ class PartInspectionPresenter(QObject):
         if not folder or not Path(folder).is_dir():
             self._warn("Choose a valid input folder.")
             return
-        self._apply_ui_to_ref()
-        self._store.save_settings(self._ref)   # keep the exact rules used for this run
+        if self._can_edit:
+            self._apply_ui_to_ref()
+            self._store.save_settings(self._ref)   # keep the exact rules used for this run
+        self._audit("batch_started", f"{self._ref.name} <- {folder}")
+        self._run_folder = folder
         self._items = []
         self.view.populate_table([])
         self.view.set_summary("Running…")
@@ -177,12 +237,26 @@ class PartInspectionPresenter(QObject):
 
     def _on_finished(self, summary):
         self._items = list(summary.items)
+        self._record_history(summary)
         self.view.set_running(False)
         state = "Cancelled — " if summary.cancelled else ""
         self.view.set_summary(f"{state}{len(summary.items)} parts:  {summary.ok} OK  ·  {summary.ng} NG  ·  {summary.errors} errors")
         self.view.set_results_available(bool(summary.output_dir))
         self._apply_filter(self.view.cmbFilter.currentText())
         self._worker = None
+
+    def _record_history(self, summary):
+        if self._history is None or self._ref is None:
+            return
+        try:
+            user = self._session.user if self._session else None
+            batch_id = self._history.record_batch(summary, self._ref.name, getattr(self, "_run_folder", ""),
+                                                  user, self._ref.params.to_dict())
+            self._audit("batch_finished", f"#{batch_id} {self._ref.name}: {summary.ok} OK / {summary.ng} NG / "
+                                          f"{summary.errors} errors")
+        except Exception:
+            log.exception("Could not record the batch in the history")
+            self._warn("The batch finished, but it could not be saved to the history database.")
 
     def _on_failed(self, message: str):
         self.view.set_running(False)

@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import re
 import shutil
+import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
@@ -117,3 +118,41 @@ class ReferenceStore:
         d = self._dir(name)
         if (d / _META).is_file():
             shutil.rmtree(d)
+
+    # ── share a recipe as a single .zip ──
+    def export_zip(self, name: str, zip_path) -> Path:
+        d = self._dir(name)
+        if not (d / _META).is_file():
+            raise FileNotFoundError(f"Reference '{name}' not found.")
+        zip_path = Path(zip_path)
+        with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+            for f in sorted(d.iterdir()):
+                if f.is_file():
+                    zf.write(f, f.name)
+        return zip_path
+
+    def import_zip(self, zip_path, new_name: Optional[str] = None) -> ReferenceSet:
+        """Import a recipe exported with export_zip. Only flat, expected files are extracted
+        (no paths, so a malicious archive cannot write outside the reference folder)."""
+        with zipfile.ZipFile(zip_path) as zf:
+            members = {i.filename: i for i in zf.infolist() if not i.is_dir()}
+            if _META not in members:
+                raise ValueError("This file is not a Light Microscope reference export.")
+            meta = json.loads(zf.read(_META).decode("utf-8"))
+            name = safe_name(new_name or Path(zip_path).stem)
+            d = self._dir(name)
+            if (d / _META).exists():
+                raise FileExistsError(f"Reference '{name}' already exists.")
+            wanted = [n for n in meta.get("images", []) if re.fullmatch(r"golden_\d{3,}\.png", n)]
+            if not wanted or any(n not in members for n in wanted):
+                raise ValueError("The archive is missing its golden images.")
+            d.mkdir(parents=True)
+            try:
+                for n in wanted:
+                    (d / n).write_bytes(zf.read(n))
+                meta["images"] = wanted
+                (d / _META).write_text(json.dumps(meta, indent=2), encoding="utf-8")
+            except Exception:
+                shutil.rmtree(d, ignore_errors=True)
+                raise
+        return self.load(name)

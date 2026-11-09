@@ -164,7 +164,7 @@
         </property>
        </widget>
       </item>
-      <item row="2" column="0" colspan="3">
+      <item row="2" column="0" colspan="2">
        <widget class="QPushButton" name="btnInspect">
         <property name="minimumSize">
          <size>
@@ -177,6 +177,22 @@
         </property>
         <property name="text">
          <string>Part Inspection (batch OK / NG)</string>
+        </property>
+       </widget>
+      </item>
+      <item row="2" column="2">
+       <widget class="QPushButton" name="btnHistory">
+        <property name="minimumSize">
+         <size>
+          <width>220</width>
+          <height>110</height>
+         </size>
+        </property>
+        <property name="toolTip">
+         <string>History &amp; Statistics — past inspections, reject rates, reports</string>
+        </property>
+        <property name="text">
+         <string>History &amp;&amp; Statistics</string>
         </property>
        </widget>
       </item>

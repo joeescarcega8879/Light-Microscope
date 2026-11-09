@@ -106,3 +106,35 @@ def test_batch_copy_ok_option(store, tmp_path):
     write_image(src / "a.png", make_part())
     run_batch(src, ref, out, copy_ok=True)
     assert (out / "OK" / "a.png").exists()
+
+
+# ── recipe export / import ──
+def test_export_import_roundtrip(store, tmp_path):
+    store.create("A", [make_part(), make_part(seed=2)], InspectionParams(threshold=33),
+                 [Roi(0.1, 0.1, 0.2, 0.2, "ignore")])
+    z = store.export_zip("A", tmp_path / "A.zip")
+    other = ReferenceStore(tmp_path / "elsewhere")
+    ref = other.import_zip(z)
+    assert ref.name == "A" and len(ref.image_paths) == 2
+    assert ref.params.threshold == 33 and ref.rois[0].mode == "ignore"
+    with pytest.raises(FileExistsError):
+        other.import_zip(z)
+    assert other.import_zip(z, "A copy").name == "A copy"
+
+
+def test_import_rejects_zip_slip_and_foreign_archives(store, tmp_path):
+    import json, zipfile
+    evil = tmp_path / "evil.zip"
+    with zipfile.ZipFile(evil, "w") as zf:
+        zf.writestr("reference.json", json.dumps({"images": ["../../escape.png"], "rois": [], "params": {}}))
+        zf.writestr("../../escape.png", b"x")
+    with pytest.raises(ValueError):
+        store.import_zip(evil)
+    assert not (tmp_path / "escape.png").exists()
+    assert store.list_names() == []
+
+    foreign = tmp_path / "foreign.zip"
+    with zipfile.ZipFile(foreign, "w") as zf:
+        zf.writestr("hello.txt", "hi")
+    with pytest.raises(ValueError):
+        store.import_zip(foreign)

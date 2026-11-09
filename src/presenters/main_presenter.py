@@ -16,3 +16,5 @@ class MainPresenter:
         self.view.measurement_requested.connect(self.main_app.open_length_measurement_view)
         self.view.contour_detection_requested.connect(self.main_app.open_contour_detection_view)
         self.view.part_inspection_requested.connect(self.main_app.open_part_inspection_view)
+        self.view.history_requested.connect(self.main_app.open_history_view)
+        self.view.sign_out_requested.connect(self.main_app.sign_out)

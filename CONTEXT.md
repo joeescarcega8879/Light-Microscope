@@ -411,3 +411,16 @@ Batch "compare against golden reference → OK/NG" workflow. Dashboard button `b
 - **Batch** (`src/inspection/batch.py`): `run_batch` → `BatchSummary`; NG originals + `<name>_diff.png` go to `<out>/NG/`, optional `<out>/OK/`, always `<out>/results.csv`. One unreadable file becomes an `ERROR` row, never aborts the batch. Runs off the GUI thread in `src/models/batch_inspection_worker.py`.
 - **UI**: `PartInspectionView` (built in code, not a `.ui`) + `RoiCanvas` (drag = ROI in current mode, right-click = delete) + `PartInspectionPresenter`. The old `ImageComparisonPresenter` now calls `inspect_image` (image B aligned onto A; no more same-size error).
 - Tests: `tests/test_inspection_*.py`, `tests/test_part_inspection_ui.py`. `tests/conftest.py` redirects `QSettings` to a temp file so tests never touch real user settings.
+
+## Data, users and reporting (Phase 2)
+
+- **Database** (`src/data/database.py`): SQLite at `~/.light_microscope/light_microscope.db`, versioned with `PRAGMA user_version` and the `_MIGRATIONS` list (append a new script to migrate; never edit old ones). Tables: `users`, `batches`, `inspections` (FK cascade on batch delete), `audit_log`. Timestamps are *local* time text so `date(ts)` groups by local day.
+- **Auth** (`src/data/auth.py`): PBKDF2-SHA256 (240k iterations, per-user salt), same error for unknown user / wrong password, lock for 60 s after 5 failures, the last active admin cannot be demoted or disabled. `PERMISSIONS` maps permission → minimum role (`operator < supervisor < admin`); check with `session.can("...")`, never by comparing role strings in UI code.
+- **Session** (`src/data/session.py`): the signed-in user + `audit(action, detail)`. `MainApplication.session` is replaced on login/sign-out; presenters receive it in their constructor.
+- **History** (`src/data/history.py`): `record_batch` (one transaction), `query_inspections`/`list_batches` with `Filters`, `stats` (reject rate = NG / (OK+NG); errors excluded), CSV export neutralises spreadsheet formulas.
+- **Login flow**: `LoginPresenter` switches `LoginView` to *setup mode* (confirm-password field) when there are no users, creating the first admin.
+- **Permissions in the UI**: `MainView.apply_permissions`, `PartInspectionView.set_editing_enabled` (also stops operators persisting rule changes when they press Run), `HistoryView.set_can_export/set_can_delete/set_audit_visible`. The presenter re-checks the permission before acting; disabling a button is not security.
+- **Reports** (`src/utils/pdf_report.py`): QTextDocument → QPdfWriter, no extra dependency. Do NOT call `doc.setPageSize(...)` with the writer's size (QPdfWriter is 1200 dpi; this shrinks everything to a sliver — there is a regression test). All dynamic text is HTML-escaped.
+- **Recipes**: `ReferenceStore.export_zip/import_zip` (flat archive, only `golden_NNN.png` + `reference.json` are extracted — zip-slip safe).
+- **Charts**: `src/views/charts.py` (`StackedBarChart`, `HBarChart`) painted with QPainter; no matplotlib.
+- Tests: `test_data_layer.py`, `test_pdf_report.py`, `test_app_flow.py` (login → roles → batch → history → sign-out through the real `MainApplication`).

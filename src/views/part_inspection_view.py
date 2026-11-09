@@ -20,6 +20,8 @@ class PartInspectionView(QWidget):
     add_golden_requested = pyqtSignal()
     delete_reference_requested = pyqtSignal()
     save_settings_requested = pyqtSignal()
+    export_reference_requested = pyqtSignal()
+    import_reference_requested = pyqtSignal()
     browse_input_requested = pyqtSignal()
     browse_output_requested = pyqtSignal()
     run_requested = pyqtSignal()
@@ -61,6 +63,13 @@ class PartInspectionView(QWidget):
             row.addWidget(wdg)
         row.setStretch(0, 1)
         rl.addLayout(row)
+        share = QHBoxLayout()
+        self.btnExportRef = QPushButton("Export reference (.zip)…")
+        self.btnImportRef = QPushButton("Import reference (.zip)…")
+        share.addWidget(self.btnExportRef)
+        share.addWidget(self.btnImportRef)
+        share.addStretch(1)
+        rl.addLayout(share)
         self.lblRefInfo = QLabel("No reference selected")
         rl.addWidget(self.lblRefInfo)
 
@@ -107,6 +116,8 @@ class PartInspectionView(QWidget):
         self.btnAddGolden.clicked.connect(self.add_golden_requested.emit)
         self.btnDeleteRef.clicked.connect(self.delete_reference_requested.emit)
         self.btnSaveSettings.clicked.connect(self.save_settings_requested.emit)
+        self.btnExportRef.clicked.connect(self.export_reference_requested.emit)
+        self.btnImportRef.clicked.connect(self.import_reference_requested.emit)
         self.btnClearRois.clicked.connect(self.canvas.clear_rois)
         self.rdoInclude.toggled.connect(lambda on: self.canvas.set_mode("include" if on else "ignore"))
         return w
@@ -229,6 +240,18 @@ class PartInspectionView(QWidget):
         self.spnMaxDefects.setValue(p.max_defects)
         self.chkAlign.setChecked(p.align)
         self.chkLight.setChecked(p.normalize_lighting)
+
+    def set_editing_enabled(self, enabled: bool):
+        """Lock everything that changes a reference or its rules (role-based)."""
+        for w in (self.btnNewRef, self.btnAddGolden, self.btnDeleteRef, self.btnSaveSettings,
+                  self.btnImportRef, self.btnClearRois, self.rdoInclude, self.rdoIgnore,
+                  self.canvas, self.spnThreshold, self.spnBlur, self.spnMinArea, self.spnMaxDefects,
+                  self.chkAlign, self.chkLight):
+            w.setEnabled(enabled)
+        tip = "" if enabled else "Requires the supervisor or administrator role"
+        for w in (self.btnNewRef, self.btnAddGolden, self.btnDeleteRef, self.btnSaveSettings, self.btnImportRef):
+            w.setToolTip(tip)
+        self.btnExportRef.setEnabled(enabled)
 
     # ── batch controls ──
     def input_dir(self) -> str:

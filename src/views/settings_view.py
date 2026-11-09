@@ -1,16 +1,21 @@
 import os
 from PyQt6 import uic
 from PyQt6.QtCore import pyqtSignal
-from PyQt6.QtWidgets import QDialog
+from PyQt6.QtWidgets import QDialog, QPushButton
 
 
 class SettingsView(QDialog):
     theme_selected = pyqtSignal(str)
+    manage_users_requested = pyqtSignal()
 
-    def __init__(self, theme_names: list[str], current_theme: str | None = None):
+    def __init__(self, theme_names: list[str], current_theme: str | None = None, can_manage_users: bool = False):
         super().__init__()
         self._selected_theme = current_theme or ""
         self._initialize_components(theme_names)
+        if can_manage_users:
+            btn = QPushButton("Manage users…")
+            btn.clicked.connect(self.manage_users_requested.emit)
+            self.rootLayout.insertWidget(self.rootLayout.count() - 1, btn)
 
     def _initialize_components(self, theme_names: list[str]):
         ui_path = os.path.join(os.path.dirname(__file__), "ui", "settings_dialog.ui")
