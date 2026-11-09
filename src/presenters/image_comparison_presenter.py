@@ -1,8 +1,8 @@
-import numpy as np
 from typing import Optional
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtCore import QObject
 
+from ..inspection.engine import InspectionParams, inspect_image
 from ..utils.image_utils import ImageUtils
 
 
@@ -33,14 +33,15 @@ class ImageComparisonPresenter(QObject):
 
         img_a = ImageUtils.qpixmap_to_numpy(pixmap_a)
         img_b = ImageUtils.qpixmap_to_numpy(pixmap_b)
-        threshold = self.view.get_threshold()
 
-        diff, binary_mask, heatmap = ImageUtils.compute_diff(img_a, img_b, threshold)
-        contour_img = ImageUtils.draw_contours(img_a, binary_mask)
+        # A is the reference; B is aligned onto it (handles shifts, rotation and size changes).
+        params = InspectionParams(threshold=self.view.get_threshold())
+        res = inspect_image(img_a, img_b, params)
 
-        changed = int(np.count_nonzero(binary_mask))
-        total = int(binary_mask.size)
-        pct = (changed / total) * 100
-        stats_text = f"Changed pixels: {changed:,} / {total:,}  ({pct:.1f}%)"
-
-        self.main_app.open_comparison_result_view(diff, heatmap, contour_img, stats_text)
+        lines = [
+            f"Verdict: {res.verdict}  ·  {len(res.defects)} difference(s)  ·  "
+            f"changed area {res.defect_area_px:,} px ({res.defect_area_pct:.2f}%)",
+            f"Alignment: {res.align.method if res.align.success else 'failed'}",
+        ]
+        lines += res.warnings
+        self.main_app.open_comparison_result_view(res.diff, res.heatmap, res.overlay, "\n".join(lines))

@@ -11,6 +11,7 @@ class MainView(QMainWindow):
     settings_requested = pyqtSignal()
     ai_studio_requested = pyqtSignal()
     contour_detection_requested = pyqtSignal()
+    part_inspection_requested = pyqtSignal()
 
     def __init__(self):
         super().__init__()
@@ -26,3 +27,4 @@ class MainView(QMainWindow):
         self.btnSettings.clicked.connect(self.settings_requested.emit)
         self.btnAiStudio.clicked.connect(self.ai_studio_requested.emit)
         self.btnContours.clicked.connect(self.contour_detection_requested.emit)
+        self.btnInspect.clicked.connect(self.part_inspection_requested.emit)

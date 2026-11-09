@@ -15,3 +15,4 @@ class MainPresenter:
         self.view.ai_studio_requested.connect(self.main_app.open_ai_studio_view)
         self.view.measurement_requested.connect(self.main_app.open_length_measurement_view)
         self.view.contour_detection_requested.connect(self.main_app.open_contour_detection_view)
+        self.view.part_inspection_requested.connect(self.main_app.open_part_inspection_view)

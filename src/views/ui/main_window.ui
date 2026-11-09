@@ -164,6 +164,22 @@
         </property>
        </widget>
       </item>
+      <item row="2" column="0" colspan="3">
+       <widget class="QPushButton" name="btnInspect">
+        <property name="minimumSize">
+         <size>
+          <width>220</width>
+          <height>110</height>
+         </size>
+        </property>
+        <property name="toolTip">
+         <string>Part Inspection — compare parts against a golden reference and sort OK / NG</string>
+        </property>
+        <property name="text">
+         <string>Part Inspection (batch OK / NG)</string>
+        </property>
+       </widget>
+      </item>
      </layout>
     </item>
     <item>

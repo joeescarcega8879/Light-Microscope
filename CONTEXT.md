@@ -401,3 +401,13 @@ Real-time model-based comparison landed inside the existing **"Create Video and 
 - **Settings**: `src/utils/app_settings.py` wraps `QSettings` (theme persisted; `get_last_dir`/`set_last_dir` helpers available).
 - **Platform helpers**: `src/utils/platform_utils.py` — `open_folder()` (cross-platform) and `default_torch_device()` (cuda → mps → cpu), used by `YoloTrainer`.
 - **Tests**: `tests/` (pytest, headless via `QT_QPA_PLATFORM=offscreen`); CI in `.github/workflows/ci.yml`. Weights (`*.pt`) are gitignored.
+
+## Part Inspection (Phase 1)
+
+Batch "compare against golden reference → OK/NG" workflow. Dashboard button `btnInspect` → `MainApplication.open_part_inspection_view`.
+
+- **Engine** (`src/inspection/engine.py`, pure OpenCV/NumPy, no Qt): `align_image` (ORB + RANSAC similarity transform, ECC fallback for featureless images; scale sanity-checked; near-identity skips warping), `inspect_image` (align → ROI mask ∩ valid-warp mask → brightness/contrast match → blur → absdiff → threshold → morphological open → connected components filtered by `min_defect_area` → verdict), `inspect_against_references` (several goldens; a part passes if ANY matches; best = fewest defect px). `InspectionParams` (verdict rules: NG if `defects > max_defects` or area % > `max_defect_area_pct`) and `Roi` (normalized rects, `include`/`ignore`) serialize to JSON. Alignment failure is a *warning*, not a verdict change.
+- **References** (`src/inspection/reference.py`): `ReferenceStore` keeps `~/.light_microscope/references/<name>/{golden_NNN.png, reference.json}`; names are sanitized (no path traversal).
+- **Batch** (`src/inspection/batch.py`): `run_batch` → `BatchSummary`; NG originals + `<name>_diff.png` go to `<out>/NG/`, optional `<out>/OK/`, always `<out>/results.csv`. One unreadable file becomes an `ERROR` row, never aborts the batch. Runs off the GUI thread in `src/models/batch_inspection_worker.py`.
+- **UI**: `PartInspectionView` (built in code, not a `.ui`) + `RoiCanvas` (drag = ROI in current mode, right-click = delete) + `PartInspectionPresenter`. The old `ImageComparisonPresenter` now calls `inspect_image` (image B aligned onto A; no more same-size error).
+- Tests: `tests/test_inspection_*.py`, `tests/test_part_inspection_ui.py`. `tests/conftest.py` redirects `QSettings` to a temp file so tests never touch real user settings.

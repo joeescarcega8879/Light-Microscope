@@ -11,6 +11,7 @@ from src.views.image_comparison_result_view import ImageComparisonResultView
 from src.views.yolo_studio_view import YoloStudioView
 from src.views.length_measurement_view import LengthMeasurementView
 from src.views.contour_detection_view import ContourDetectionView
+from src.views.part_inspection_view import PartInspectionView
 
 from src.presenters.login_presenter import LoginPresenter
 from src.presenters.main_presenter import MainPresenter
@@ -20,6 +21,7 @@ from src.presenters.settings_presenter import SettingsPresenter
 from src.presenters.yolo_studio_presenter import YoloStudioPresenter
 from src.presenters.length_measurement_presenter import LengthMeasurementPresenter
 from src.presenters.contour_detection_presenter import ContourDetectionPresenter
+from src.presenters.part_inspection_presenter import PartInspectionPresenter
 
 from src.utils.theme_manager import ThemeManager
 from src.utils import app_settings
@@ -102,6 +104,14 @@ class MainApplication:
         self.main_window.hide()
         self.contour_detection_view.setWindowTitle("Contour Detection")
         self.contour_detection_view.show()
+
+    def open_part_inspection_view(self):
+        self.part_inspection_view = PartInspectionView()
+        self.part_inspection_presenter = PartInspectionPresenter(self.part_inspection_view)
+        self.part_inspection_view.view_closed.connect(self._show_dashboard)
+
+        self.main_window.hide()
+        self.part_inspection_view.show()
 
     def open_settings_dialog(self):
         theme_names = self._theme_manager.theme_names()
